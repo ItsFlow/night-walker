@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Launch-at-login LaunchAgent for color-filter-scheduler.
+
+  install.sh substitutes __APP_BINARY__ and __LOGDIR__ and writes the result to
+  ~/Library/LaunchAgents/com.flo.color-filter-scheduler.plist.
+
+  This is a per-user LaunchAgent (NOT a LaunchDaemon): it must run in the user's
+  GUI login session so the menu-bar item appears and the Color Filters change
+  applies to the live display. It simply launches the menu-bar app at login; the
+  app itself owns the reconcile timer and wake handling, so there is no
+  StartInterval here. RunAtLoad starts it at login; KeepAlive is false so
+  choosing "Quit" from the menu actually quits it.
+
+  This LaunchAgent approach is used instead of SMAppService because it is
+  reliable under ad-hoc signing on Command Line Tools.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.flo.color-filter-scheduler</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__APP_BINARY__</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>StandardOutPath</key>
+    <string>__LOGDIR__/color-filter-scheduler.log</string>
+    <key>StandardErrorPath</key>
+    <string>__LOGDIR__/color-filter-scheduler.err.log</string>
+</dict>
+</plist>

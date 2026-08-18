@@ -1,0 +1,12 @@
+# SwiftPM build products
+.build/
+*.o
+*.swiftmodule
+
+# Compiled binaries and assembled app bundle (build scripts create these)
+/color-filter-scheduler
+/bin/
+/dist/
+
+# macOS
+.DS_Store
