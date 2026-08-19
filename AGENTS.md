@@ -7,9 +7,10 @@ An `LSUIElement` macOS menu-bar app that turns Accessibility → Display → Col
 Filters ON at sunset / OFF at sunrise. CLT-only (no Xcode), zero third-party
 deps. See `README.md` and `EVIDENCE.md`.
 
-## UI layer (SwiftUI popover, "Left" style)
-The presentation is a custom near-black `NSPopover` hosting SwiftUI, **not** an
-`NSMenu`. Deployment target is **macOS 13** (Package.swift + bundle.sh
+## UI layer (SwiftUI key panel, "Left" style)
+The presentation is a custom near-black, borderless `NSPanel` hosting SwiftUI,
+**not** an `NSMenu` or `NSPopover`. Deployment target is **macOS 13**
+(Package.swift + bundle.sh
 `LSMinimumSystemVersion`) for SwiftUI + `ImageRenderer`. Files:
 - `AppModel.swift` — `ObservableObject` bridge; the UI never calls the engine
   directly. Documents the manual-Run/Pause vs. Automatic override rule. Also
@@ -25,24 +26,17 @@ The presentation is a custom near-black `NSPopover` hosting SwiftUI, **not** an
   warm/red Color Filter is applied (a warm fill blends into the tint). Also
   `PanelEvidence` (renders panel PNGs via NSHostingView + `cacheDisplay` —
   `ImageRenderer` stubs AppKit controls).
-- Popover dismissal: behavior is **`.applicationDefined`, not `.transient`**.
-  A transient popover also auto-closes whenever this accessory (`LSUIElement`)
-  app *resigns active* — which is easily lost and reads as "closed when I moved
-  the mouse away". `AppDelegate` instead installs a global mouse-down monitor
-  (outside click) + a local Esc monitor while open, so it dismisses only on an
-  explicit outside click or Esc.
-  - **Sharp edge (fixed; do not regress):** a global monitor is only *supposed*
-    to see *other* apps' events, but for this accessory app the popover window is
-    not always the active app's key window (right after the status item shows it,
-    and whenever active state is lost), so an **inside** click can reach the
-    global monitor. The monitor must therefore **hit-test** the click and close
-    only when it is genuinely outside the panel (and not on the status item) —
-    see `AppDelegate.clickShouldDismiss`. Closing on *any* global mouse-down shut
-    the panel on the very click that opened Settings. RCA:
-    `docs/evidence/cfs-popfix/RCA.md`. Guarded by `--selftest`.
+- Dismissal is a key-window lifecycle, not mouse hit-testing: `StatusPanel`
+  stays key for controls and text, `windowDidResignKey` handles a genuine
+  click-away, and a local key monitor handles Esc. **Never reintroduce a global
+  mouse monitor or raw screen-frame hit-test** for dismissal; both failed for
+  inside interactions in this `LSUIElement` app. RCA:
+  `docs/evidence/cfs-ui3/RCA.md`. Guarded by `--selftest` and
+  `tests/panel-contract.sh`.
 - `MenuBarIcon.swift` — programmatic monochrome template status icon.
 - `tools/make-appicon.swift` — renders the `.icns` iconset; run by `bundle.sh`.
-- `--render-panel <dir>` CLI regenerates `docs/evidence/cfs-ui/` screenshots.
+- `--render-panel <dir>` CLI regenerates the AppKit-backed panel screenshots
+  (current evidence: `docs/evidence/cfs-ui3/`).
 Any UI/engine testing MUST restore Color Filters to the pre-test state (see
 below); `--render-panel` is read-only w.r.t. the live filter.
 
@@ -54,8 +48,8 @@ below); `--render-panel` is read-only w.r.t. the live filter.
   LaunchAgent (`com.flo.color-filter-scheduler.plist.template`).
 - The binary doubles as a headless test CLI (`--get`, `--set-enabled`,
   `--set-intensity`, `--decide/--reconcile --lat --lon [--apply]`,
-  `--engine-status`, `--engine-reconcile`, `--selftest` = popover-dismissal
-  logic test, exit 0 = pass). No args → menu-bar GUI.
+  `--engine-status`, `--engine-reconcile`, `--selftest` = key-panel architecture
+  regression, exit 0 = pass). No args → menu-bar GUI.
 
 ## MediaAccessibility SPI (the load-bearing, non-obvious part)
 Declared in `Sources/CMediaAccessibility/include/CMediaAccessibility.h`. Private

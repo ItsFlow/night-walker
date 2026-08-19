@@ -24,13 +24,13 @@ enum Palette {
     static let warn = Color(red: 0.96, green: 0.68, blue: 0.34)
 }
 
-/// The custom dark popover panel, styled after the captain's preferred "Left"
+/// The custom dark key panel, styled after the captain's preferred "Left"
 /// menu-bar app: a rounded near-black panel, a clean header (glyph + name, a
-/// small pill top-right), generous spacing, and a subtle footer. The big
+/// bare gear top-right), generous spacing, and a subtle footer. The big
 /// Run/Pause button — not a text subtitle — is the on/off state indicator.
 ///
 /// Two pages live here — the tiny front panel and a Settings page — switched by
-/// local state, so the whole thing stays a single popover.
+/// local state, so the whole thing stays in a single window.
 struct PanelView: View {
     @ObservedObject var model: AppModel
     var quit: () -> Void
@@ -63,7 +63,7 @@ private struct FrontPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header row: glyph + name + status, gear pill top-right.
+            // Header row: glyph + name, bare settings gear top-right.
             HStack(alignment: .center, spacing: 10) {
                 FilterGlyph().frame(width: 22, height: 22)
                 // Just the name — the Run/Pause button below IS the state indicator.
@@ -71,10 +71,9 @@ private struct FrontPage: View {
                     .font(.system(size: 14, weight: .semibold))
                 Spacer(minLength: 8)
                 Button(action: openSettings) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 11, weight: .semibold))
-                        .padding(.horizontal, 9).padding(.vertical, 5)
-                        .background(Capsule().fill(Color.primary.opacity(0.08)))
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(5)
                 }
                 .buttonStyle(.plain)
                 .help("Settings")
@@ -93,13 +92,10 @@ private struct FrontPage: View {
                     Image(systemName: "location.fill")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Text("Location")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                    Spacer()
                     Text(model.locationDisplay)
                         .font(.system(size: 12, weight: .medium))
                         .lineLimit(1)
+                    Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.tertiary)
@@ -169,23 +165,21 @@ private struct SettingsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header: back + title.
+            // Header: a single back affordance; no redundant page title.
             HStack(spacing: 8) {
                 Button(action: back) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 12, weight: .semibold))
                         .padding(6)
-                        .background(Capsule().fill(Color.primary.opacity(0.08)))
                 }
                 .buttonStyle(.plain)
-                Text("Settings").font(.system(size: 14, weight: .semibold))
                 Spacer()
             }
             .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 12)
 
             Divider().opacity(0.5)
 
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 17) {
                 StrengthControl(model: model)
                 LocationControl(model: model, initiallyExpanded: locationExpanded)
                 AutomaticControl(model: model)
@@ -213,19 +207,17 @@ private struct StrengthControl: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Strength").font(.system(size: 12, weight: .medium))
-                Spacer()
-                Text("\(Int((model.strength * 100).rounded()))%")
-                    .font(.system(size: 12, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
+        HStack(spacing: 10) {
             Slider(value: Binding(get: { model.strength },
                                   set: { model.setStrength($0) }),
                    in: 0...1)
             .controlSize(.small)
+            .accessibilityLabel("Strength")
+            Text("\(Int((model.strength * 100).rounded()))%")
+                .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(width: 36, alignment: .trailing)
         }
     }
 }
@@ -243,20 +235,9 @@ private struct LocationControl: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Location").font(.system(size: 12, weight: .medium))
-                Spacer()
-                Button(showFineTune ? "Hide lat/long" : "Set lat/long") {
-                    withAnimation(.easeInOut(duration: 0.12)) { showFineTune.toggle() }
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.tertiary)
-            }
-
             // Primary input: type a city, resolve to coordinates.
             HStack(spacing: 8) {
-                TextField("City — e.g. Lisbon", text: $model.cityText)
+                TextField("Your location", text: $model.cityText)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 12))
                     .onSubmit { model.resolveCity() }
@@ -271,11 +252,25 @@ private struct LocationControl: View {
                 .disabled(model.isGeocoding)
             }
 
-            if !model.geocodeMessage.isEmpty {
-                Text(model.geocodeMessage)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(model.lastGeocodeOK ? Color.secondary : Palette.warn)
-                    .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if !model.geocodeMessage.isEmpty {
+                    Text(model.geocodeMessage)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(model.lastGeocodeOK ? Color.secondary : Palette.warn)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if model.hasLocation {
+                    Text(model.locationDisplay)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Button(showFineTune ? "Hide lat/long" : "Lat/long") {
+                    withAnimation(.easeInOut(duration: 0.12)) { showFineTune.toggle() }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.tertiary)
             }
 
             // Fine-tune / offline override: the precise lat/long fields, retained.
@@ -292,9 +287,6 @@ private struct LocationControl: View {
                     Button("Set") { model.applyLocation() }
                         .controlSize(.regular)
                 }
-                Text("Precise override — works offline, no geocoding.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -304,17 +296,12 @@ private struct AutomaticControl: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Toggle(isOn: Binding(get: { model.automationEnabled },
-                                 set: { model.setAutomation($0) })) {
-                Text("Automatic").font(.system(size: 12, weight: .medium))
-            }
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            Text("Follow the sun — filter on from sunset to sunrise.")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
+        Toggle(isOn: Binding(get: { model.automationEnabled },
+                             set: { model.setAutomation($0) })) {
+            Text("Automatic").font(.system(size: 12, weight: .medium))
         }
+        .toggleStyle(.switch)
+        .controlSize(.small)
     }
 }
 

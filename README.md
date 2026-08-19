@@ -21,20 +21,19 @@ tint, protanopia, etc.) is preserved.
 
 ## The menu-bar UI
 
-A **custom dark rounded popover** (SwiftUI in an `NSPopover`), not a stock menu.
-See `docs/evidence/cfs-ui/` for screenshots.
+A **custom dark rounded key panel** (SwiftUI in a borderless `NSPanel`), not a
+stock menu. See `docs/evidence/cfs-ui3/` for current screenshots.
 
 **Front panel** — deliberately tiny:
-- **Header** — a day/night glyph, the name, and a one-line status (`On` /
-  `Off` / `Off · auto`), plus a settings pill.
+- **Header** — a day/night glyph, the name, and a bare settings gear.
 - **Run / Pause** — the primary control. **Run** turns Color Filters **ON**
   live (the screen visibly changes); **Pause** turns them **OFF** live.
-- **Location** — shows the current coordinates; tap to open the editor.
+- A compact location row opens the editor.
 
-**Settings** (behind the header pill):
-- **Strength** — a 0–100% slider for the real macOS Color Filters intensity
-  (the "Color Tint" / single-color intensity). Applies live.
-- **Location** — latitude / longitude fine-tune.
+**Settings** (behind the gear):
+- A 0–100% slider for the real macOS Color Filters intensity. Applies live.
+- A single city field (Apple geocoding) with collapsible latitude / longitude
+  fine-tune fields.
 - **Automatic (sunset → sunrise)** — master switch for solar automation.
 - **Quit**.
 
@@ -76,7 +75,7 @@ swift build -c release                 # binary at .build/release/color-filter-s
 
 This builds and bundles the app, installs it to `~/Applications`, writes a
 per-user LaunchAgent that launches it at login, and starts it now. Then click the
-menu-bar icon; use **Run** to try the filter, and open **Settings** (header pill)
+menu-bar icon; use **Run** to try the filter, and open Settings (the header gear)
 to set your location and turn on **Automatic**.
 
 ## Test manually (headless commands)
@@ -115,7 +114,7 @@ The login-item agent writes to `~/Library/Logs/color-filter-scheduler.log`
 ## Requirements
 
 - macOS 13+ with Command Line Tools (`swiftc` / `swift`). Apple Silicon or Intel.
-  (The SwiftUI popover UI sets the deployment target to macOS 13.)
+  (The SwiftUI panel UI sets the deployment target to macOS 13.)
 - Choose a Color Filters *type* once in System Settings → Accessibility →
   Display → Color Filters. This app flips the master and adjusts intensity; it
   doesn't pick the type.

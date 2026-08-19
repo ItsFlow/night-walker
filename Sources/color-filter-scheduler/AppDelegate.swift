@@ -1,19 +1,67 @@
 import AppKit
 import SwiftUI
 
+/// A menu-bar panel must be able to become key even though it has no title bar.
+/// Keeping it key is the reliable boundary between an inside interaction and a
+/// genuine click-away; no global mouse observation or coordinate hit-test is
+/// involved.
+final class StatusPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+
+    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask,
+                  backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+        super.init(contentRect: contentRect, styleMask: style,
+                   backing: backingStoreType, defer: flag)
+        configureForStatusItem()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+
+    private func configureForStatusItem() {
+        appearance = NSAppearance(named: .darkAqua)
+        backgroundColor = .clear
+        isOpaque = false
+        hasShadow = true
+        level = .popUpMenu
+        collectionBehavior = [.canJoinAllSpaces, .transient, .fullScreenAuxiliary]
+        isFloatingPanel = true
+        // City/lat/lon are editable. Keep the whole panel key, rather than
+        // becoming key only when a particular hit view requests it.
+        becomesKeyOnlyIfNeeded = false
+        hidesOnDeactivate = false
+        animationBehavior = .utilityWindow
+    }
+}
+
+/// Tracks the ideal SwiftUI size so the borderless panel remains compact when
+/// moving between the short front page and the taller Settings page.
+final class PanelHostingController<Content: View>: NSHostingController<Content> {
+    var preferredSizeDidChange: ((NSSize) -> Void)?
+
+    override var preferredContentSize: NSSize {
+        didSet {
+            guard preferredContentSize != oldValue else { return }
+            preferredSizeDidChange?(preferredContentSize)
+        }
+    }
+}
+
 /// Menu-bar-only agent. Owns the NSStatusItem, the reconcile timer, and the
-/// custom SwiftUI popover panel (the "Left"-style UI). The scheduling engine
+/// custom SwiftUI key panel (the "Left"-style UI). The scheduling engine
 /// (Settings / ReconcileEngine / ColorFilters / Solar) is unchanged; this file
 /// is purely the presentation layer plus the timer/wake wiring.
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem!
-    private var popover: NSPopover!
+    private var panel: StatusPanel!
+    private var hostingController: PanelHostingController<PanelView>!
     private var model: AppModel!
     private var timer: Timer?
-    // Event monitors installed only while the popover is open, so it dismisses
-    // on an explicit outside click or Esc — never on mere mouse-leave.
-    private var globalClickMonitor: Any?
+    // Esc is the only event monitor. Outside clicks are represented by the key
+    // panel resigning key status; inside clicks never do so.
     private var localKeyMonitor: Any?
+    private var isClosingPanel = false
 
     // Reconcile cadence. Kept modest so transitions land within a few minutes of
     // the true sunrise/sunset without busy-looping.
@@ -22,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         model = AppModel()
         buildStatusItem()
-        buildPopover()
+        buildPanel()
 
         // Reconcile now, on a timer, and on wake from sleep.
         reconcileAndRefresh()
@@ -55,7 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = MenuBarIcon.image()
-            button.action = #selector(togglePopover(_:))
+            button.action = #selector(togglePanel(_:))
             button.target = self
         }
     }
@@ -66,100 +114,100 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.button?.appearsDisabled = false
     }
 
-    // MARK: - Popover
+    // MARK: - Key panel
 
-    private func buildPopover() {
-        let pop = NSPopover()
-        // `.applicationDefined` (not `.transient`): a transient popover also
-        // auto-closes whenever this accessory app *resigns active* — which is
-        // exactly what made the panel appear to close "when the mouse moved
-        // away", since an LSUIElement's active state is easily lost. We take
-        // full control instead: the popover never auto-closes; we dismiss it
-        // ourselves only on an explicit outside click or the Esc key (see the
-        // monitors in `openPopover`), so it stays open until the user means it.
-        pop.behavior = .applicationDefined
-        pop.animates = true
-        pop.appearance = NSAppearance(named: .darkAqua)   // "Left"-style dark panel
+    private func buildPanel() {
         let root = PanelView(model: model, quit: { NSApp.terminate(nil) })
-        pop.contentViewController = NSHostingController(rootView: root)
-        popover = pop
-    }
+        let host = PanelHostingController(rootView: root)
+        host.sizingOptions = [.preferredContentSize]
 
-    @objc private func togglePopover(_ sender: Any?) {
-        if popover.isShown {
-            closePopover()
-        } else {
-            openPopover()
+        let panel = StatusPanel(
+            contentRect: NSRect(origin: .zero, size: NSSize(width: 288, height: 1)),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false)
+        panel.delegate = self
+        panel.contentViewController = host
+        panel.contentView?.wantsLayer = true
+        panel.contentView?.layer?.cornerRadius = 12
+        panel.contentView?.layer?.masksToBounds = true
+
+        self.hostingController = host
+        self.panel = panel
+        host.preferredSizeDidChange = { [weak self] size in
+            self?.resizeAndAnchorPanel(to: size)
         }
     }
 
-    private func openPopover() {
-        guard let button = statusItem.button else { return }
+    @objc private func togglePanel(_ sender: Any?) {
+        panel.isVisible ? closePanel() : openPanel()
+    }
+
+    private func openPanel() {
         model.refresh()
         updateStatusAppearance()
-        // Activate so the popover's text fields can take keyboard focus.
-        NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
 
-        // Outside click → dismiss. IMPORTANT: a global monitor is only *supposed*
-        // to see events destined for other apps, so the original code closed on
-        // any global mouse-down, assuming inside clicks never reach it. That
-        // assumption fails for an LSUIElement accessory app: right after the
-        // status item shows the popover (and any time the app's active state is
-        // lost — which, as the popover behavior note above says, "is easily
-        // lost"), the app is not the active app and the popover window is not
-        // key, so a click *inside* the popover is delivered as an "other
-        // application" event and DID reach this monitor — closing the panel on
-        // the very click that opened Settings (the reported bug). Fix: hit-test
-        // the click and dismiss only when it lands genuinely outside the panel
-        // (and not on the status item, whose own click is the toggle's job).
-        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
-            guard let self else { return }
-            if AppDelegate.clickShouldDismiss(
-                at: NSEvent.mouseLocation,
-                panelFrame: self.popover.contentViewController?.view.window?.frame,
-                statusItemFrame: self.statusItemScreenFrame()) {
-                self.closePopover()
-            }
-        }
-        // Esc → dismiss. Local monitor swallows the key so it doesn't beep.
+        let fittingSize = hostingController.sizeThatFits(
+            in: NSSize(width: 288, height: CGFloat.greatestFiniteMagnitude))
+        resizeAndAnchorPanel(to: fittingSize)
+
+        installEscapeMonitor()
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    private func closePanel() {
+        guard !isClosingPanel else { return }
+        isClosingPanel = true
+        defer { isClosingPanel = false }
+        removeEscapeMonitor()
+        if panel.isVisible { panel.orderOut(nil) }
+    }
+
+    private func installEscapeMonitor() {
+        guard localKeyMonitor == nil else { return }
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
             if event.keyCode == 53 {   // Esc
-                self?.closePopover()
+                self?.closePanel()
                 return nil
             }
             return event
         }
     }
 
-    private func closePopover() {
-        if let m = globalClickMonitor { NSEvent.removeMonitor(m); globalClickMonitor = nil }
-        if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
-        if popover.isShown { popover.performClose(nil) }
+    private func removeEscapeMonitor() {
+        if let monitor = localKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            localKeyMonitor = nil
+        }
     }
 
-    /// The status-item button's frame in screen coordinates, or nil if unavailable.
-    private func statusItemScreenFrame() -> NSRect? {
-        guard let button = statusItem?.button, let window = button.window else { return nil }
-        return window.convertToScreen(button.convert(button.bounds, to: nil))
+    /// A key panel resigns only when focus genuinely moves elsewhere. Controls,
+    /// slider drags, SwiftUI navigation, and text editing all remain in-window
+    /// and therefore leave it open.
+    func windowDidResignKey(_ notification: Notification) {
+        guard !isClosingPanel,
+              notification.object as? NSWindow === panel,
+              panel.isVisible else { return }
+        closePanel()
     }
 
-    /// Pure, coordinate-space-agnostic dismissal rule (unit-tested via `--selftest`).
-    ///
-    /// Given a mouse-down `point` and the current on-screen frames of the panel
-    /// window and the status-item button (all in the same screen coordinate
-    /// space), return `true` only when the click is genuinely OUTSIDE the panel —
-    /// i.e. not within the panel window and not on the status item. A click
-    /// inside the panel (any control: gear, Location, Run/Pause, Strength, a text
-    /// field) must never dismiss it; the status item is excluded because its
-    /// click is handled by `togglePopover`.
-    static func clickShouldDismiss(at point: NSPoint,
-                                   panelFrame: NSRect?,
-                                   statusItemFrame: NSRect?) -> Bool {
-        if let panelFrame, panelFrame.contains(point) { return false }
-        if let statusItemFrame, statusItemFrame.contains(point) { return false }
-        return true
+    private func resizeAndAnchorPanel(to requestedSize: NSSize) {
+        guard let button = statusItem?.button, let buttonWindow = button.window else { return }
+
+        let width: CGFloat = 288
+        let height = ceil(requestedSize.height)
+        guard height.isFinite, height > 1 else { return }
+
+        let statusFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let screenFrame = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame
+            ?? NSRect(x: statusFrame.midX - width / 2, y: statusFrame.minY - height,
+                      width: width, height: height)
+        let gap: CGFloat = 6
+        let proposedX = statusFrame.midX - width / 2
+        let x = min(max(proposedX, screenFrame.minX), screenFrame.maxX - width)
+        let top = min(statusFrame.minY - gap, screenFrame.maxY)
+        let y = max(screenFrame.minY, top - height)
+        panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: panel.isVisible)
     }
 }
