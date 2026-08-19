@@ -85,6 +85,11 @@ enum CLI {
             let dir = opts["dir"] ?? opts["_pos0"] ?? "docs/evidence/cfs-ui"
             renderPanel(dir)
             return 0
+        case "--selftest":
+            // Headless logic test for the popover-dismissal fix. XCTest is not
+            // available under CLT-only, so we assert here and return a nonzero
+            // exit on failure (usable in CI / a pre-commit gate).
+            return runSelfTest()
         case "--engine-reconcile":
             let before = ColorFilters.isEnabled
             let changed = ReconcileEngine.reconcile()
@@ -126,6 +131,52 @@ enum CLI {
         }
     }
 
+    /// Asserts `AppDelegate.clickShouldDismiss` matches the captain's contract:
+    /// the panel dismisses ONLY on a genuine outside click, never on an inside
+    /// click (any control, on either the short front page or the taller Settings
+    /// page) and never on the status item. Returns 0 if all pass, else 1.
+    private static func runSelfTest() -> Int32 {
+        var passed = 0, failed = 0
+        func check(_ name: String, _ cond: Bool) {
+            if cond { passed += 1; print("  ok   \(name)") }
+            else { failed += 1; print("  FAIL \(name)") }
+        }
+        // dismiss == true  → the click closes the panel (genuine outside click)
+        // dismiss == false → the click is kept (inside the panel / on status item)
+        func dismisses(_ p: NSPoint, _ panel: NSRect?, _ status: NSRect?) -> Bool {
+            AppDelegate.clickShouldDismiss(at: p, panelFrame: panel, statusItemFrame: status)
+        }
+
+        // Realistic frames (screen coords, bottom-left origin). Front page is
+        // short; navigating to Settings makes the panel taller (grows downward,
+        // top edge fixed just under the menu bar) — both must behave identically.
+        let front = NSRect(x: 287, y: 607, width: 314, height: 179)   // observed live size
+        let settings = NSRect(x: 287, y: 427, width: 314, height: 359) // taller Settings page
+        let statusItem = NSRect(x: 1200, y: 1050, width: 40, height: 24)
+
+        print("selftest: clickShouldDismiss")
+        // Inside the FRONT panel — no control click may dismiss it:
+        check("front: gear (top-right) kept",     !dismisses(NSPoint(x: front.maxX - 18, y: front.maxY - 16), front, statusItem))
+        check("front: Location row kept",         !dismisses(NSPoint(x: front.midX,      y: front.minY + 40), front, statusItem))
+        check("front: Run/Pause (center) kept",   !dismisses(NSPoint(x: front.midX,      y: front.midY),      front, statusItem))
+        // Inside the taller SETTINGS panel — the reported bug's exact path:
+        check("settings: back button kept",       !dismisses(NSPoint(x: settings.minX + 20, y: settings.maxY - 16), settings, statusItem))
+        check("settings: Strength/text kept",     !dismisses(NSPoint(x: settings.midX,      y: settings.midY),      settings, statusItem))
+        check("settings: lower area (Quit) kept", !dismisses(NSPoint(x: settings.midX,      y: settings.minY + 20), settings, statusItem))
+        // The status item is the toggle's job, not the dismiss monitor's:
+        check("status item click kept",           !dismisses(NSPoint(x: statusItem.midX, y: statusItem.midY), front, statusItem))
+        // Genuine outside clicks DO dismiss:
+        check("outside: far top-right dismisses",  dismisses(NSPoint(x: front.maxX + 100, y: front.maxY + 100), front, statusItem))
+        check("outside: desktop corner dismisses", dismisses(NSPoint(x: 10, y: 10), front, statusItem))
+        check("outside: just past right edge",     dismisses(NSPoint(x: front.maxX + 3, y: front.midY), front, statusItem))
+        check("outside: gap below front panel",    dismisses(NSPoint(x: front.midX, y: front.minY - 5), front, statusItem))
+        // Defensive: with no panel to protect, a stray event is treated as outside.
+        check("defensive: nil frames dismiss",     dismisses(NSPoint(x: 0, y: 0), nil, nil))
+
+        print("selftest: \(passed) passed, \(failed) failed")
+        return failed == 0 ? 0 : 1
+    }
+
     private static func boolArg(_ s: String) -> Bool? {
         switch s.lowercased() {
         case "1", "true", "on", "yes": return true
@@ -161,6 +212,8 @@ enum CLI {
                                         as --decide; with --apply, set the live state
           --render-panel [dir]          render the UI panels to PNGs (read-only;
                                         default dir: docs/evidence/cfs-ui)
+          --selftest                    run headless logic tests (popover dismissal);
+                                        exit 0 if all pass (read-only)
           --help                        this help
         """)
     }

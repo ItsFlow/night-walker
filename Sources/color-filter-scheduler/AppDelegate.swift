@@ -102,12 +102,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
 
-        // Outside click (in any other app or the desktop) → dismiss. A global
-        // monitor only sees events destined for *other* apps, so clicks inside
-        // the popover or on our status item never trigger it.
+        // Outside click → dismiss. IMPORTANT: a global monitor is only *supposed*
+        // to see events destined for other apps, so the original code closed on
+        // any global mouse-down, assuming inside clicks never reach it. That
+        // assumption fails for an LSUIElement accessory app: right after the
+        // status item shows the popover (and any time the app's active state is
+        // lost — which, as the popover behavior note above says, "is easily
+        // lost"), the app is not the active app and the popover window is not
+        // key, so a click *inside* the popover is delivered as an "other
+        // application" event and DID reach this monitor — closing the panel on
+        // the very click that opened Settings (the reported bug). Fix: hit-test
+        // the click and dismiss only when it lands genuinely outside the panel
+        // (and not on the status item, whose own click is the toggle's job).
         globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
-            self?.closePopover()
+            guard let self else { return }
+            if AppDelegate.clickShouldDismiss(
+                at: NSEvent.mouseLocation,
+                panelFrame: self.popover.contentViewController?.view.window?.frame,
+                statusItemFrame: self.statusItemScreenFrame()) {
+                self.closePopover()
+            }
         }
         // Esc → dismiss. Local monitor swallows the key so it doesn't beep.
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
@@ -123,5 +138,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let m = globalClickMonitor { NSEvent.removeMonitor(m); globalClickMonitor = nil }
         if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
         if popover.isShown { popover.performClose(nil) }
+    }
+
+    /// The status-item button's frame in screen coordinates, or nil if unavailable.
+    private func statusItemScreenFrame() -> NSRect? {
+        guard let button = statusItem?.button, let window = button.window else { return nil }
+        return window.convertToScreen(button.convert(button.bounds, to: nil))
+    }
+
+    /// Pure, coordinate-space-agnostic dismissal rule (unit-tested via `--selftest`).
+    ///
+    /// Given a mouse-down `point` and the current on-screen frames of the panel
+    /// window and the status-item button (all in the same screen coordinate
+    /// space), return `true` only when the click is genuinely OUTSIDE the panel —
+    /// i.e. not within the panel window and not on the status item. A click
+    /// inside the panel (any control: gear, Location, Run/Pause, Strength, a text
+    /// field) must never dismiss it; the status item is excluded because its
+    /// click is handled by `togglePopover`.
+    static func clickShouldDismiss(at point: NSPoint,
+                                   panelFrame: NSRect?,
+                                   statusItemFrame: NSRect?) -> Bool {
+        if let panelFrame, panelFrame.contains(point) { return false }
+        if let statusItemFrame, statusItemFrame.contains(point) { return false }
+        return true
     }
 }

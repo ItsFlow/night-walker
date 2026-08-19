@@ -31,6 +31,15 @@ The presentation is a custom near-black `NSPopover` hosting SwiftUI, **not** an
   the mouse away". `AppDelegate` instead installs a global mouse-down monitor
   (outside click) + a local Esc monitor while open, so it dismisses only on an
   explicit outside click or Esc.
+  - **Sharp edge (fixed; do not regress):** a global monitor is only *supposed*
+    to see *other* apps' events, but for this accessory app the popover window is
+    not always the active app's key window (right after the status item shows it,
+    and whenever active state is lost), so an **inside** click can reach the
+    global monitor. The monitor must therefore **hit-test** the click and close
+    only when it is genuinely outside the panel (and not on the status item) —
+    see `AppDelegate.clickShouldDismiss`. Closing on *any* global mouse-down shut
+    the panel on the very click that opened Settings. RCA:
+    `docs/evidence/cfs-popfix/RCA.md`. Guarded by `--selftest`.
 - `MenuBarIcon.swift` — programmatic monochrome template status icon.
 - `tools/make-appicon.swift` — renders the `.icns` iconset; run by `bundle.sh`.
 - `--render-panel <dir>` CLI regenerates `docs/evidence/cfs-ui/` screenshots.
@@ -45,7 +54,8 @@ below); `--render-panel` is read-only w.r.t. the live filter.
   LaunchAgent (`com.flo.color-filter-scheduler.plist.template`).
 - The binary doubles as a headless test CLI (`--get`, `--set-enabled`,
   `--set-intensity`, `--decide/--reconcile --lat --lon [--apply]`,
-  `--engine-status`, `--engine-reconcile`). No args → menu-bar GUI.
+  `--engine-status`, `--engine-reconcile`, `--selftest` = popover-dismissal
+  logic test, exit 0 = pass). No args → menu-bar GUI.
 
 ## MediaAccessibility SPI (the load-bearing, non-obvious part)
 Declared in `Sources/CMediaAccessibility/include/CMediaAccessibility.h`. Private
