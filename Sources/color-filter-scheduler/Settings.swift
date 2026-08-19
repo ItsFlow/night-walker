@@ -13,6 +13,7 @@ final class Settings {
         static let automationEnabled = "automationEnabled"
         static let latitude = "latitude"
         static let longitude = "longitude"
+        static let locationName = "locationName"
         static let sunriseOffsetMinutes = "sunriseOffsetMinutes"
         static let sunsetOffsetMinutes = "sunsetOffsetMinutes"
     }
@@ -33,6 +34,23 @@ final class Settings {
     var longitude: Double? {
         get { readOptionalDouble(Key.longitude) }
         set { setOptional(newValue, Key.longitude) }
+    }
+
+    /// Human-readable name of the resolved location (e.g. "Lisbon, Portugal").
+    /// Set when the user geocodes a city; used only for display. The scheduling
+    /// engine still runs purely off `latitude`/`longitude`.
+    var locationName: String? {
+        get {
+            let s = defaults.string(forKey: Key.locationName)
+            return (s?.isEmpty == false) ? s : nil
+        }
+        set {
+            if let value = newValue, !value.isEmpty {
+                defaults.set(value, forKey: Key.locationName)
+            } else {
+                defaults.removeObject(forKey: Key.locationName)
+            }
+        }
     }
 
     var sunriseOffsetMinutes: Double {

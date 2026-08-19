@@ -17,6 +17,7 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("MediaAccessibility"),
                 .linkedFramework("CoreFoundation"),
+                .linkedFramework("CoreLocation"),
             ]
         ),
     ]

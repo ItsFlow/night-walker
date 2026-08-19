@@ -8,14 +8,29 @@ Filters ON at sunset / OFF at sunrise. CLT-only (no Xcode), zero third-party
 deps. See `README.md` and `EVIDENCE.md`.
 
 ## UI layer (SwiftUI popover, "Left" style)
-The presentation is a custom dark `NSPopover` hosting SwiftUI, **not** an
+The presentation is a custom near-black `NSPopover` hosting SwiftUI, **not** an
 `NSMenu`. Deployment target is **macOS 13** (Package.swift + bundle.sh
 `LSMinimumSystemVersion`) for SwiftUI + `ImageRenderer`. Files:
 - `AppModel.swift` — `ObservableObject` bridge; the UI never calls the engine
-  directly. Documents the manual-Run/Pause vs. Automatic override rule.
+  directly. Documents the manual-Run/Pause vs. Automatic override rule. Also
+  owns city→coords geocoding via `CLGeocoder.geocodeAddressString` (CoreLocation,
+  a **system** framework — no third-party dep, no location permission for forward
+  geocoding; needs network only at resolve time; completions land on the main
+  queue). Resolved place name persists as `Settings.locationName` (display only —
+  the engine still runs purely off `latitude`/`longitude`).
 - `PanelView.swift` — front page (Run/Pause + Location) and Settings page
-  (Strength, lat/lon, Automatic, Quit). Also `PanelEvidence` (renders panel PNGs
-  via NSHostingView + `cacheDisplay` — `ImageRenderer` stubs AppKit controls).
+  (Strength, **city field** + collapsible lat/lon fine-tune, Automatic, Quit).
+  `Palette` holds the near-black + Run/Pause colors. The ON fill is **emerald**
+  (a cool hue) not warm orange, so it stays legible while the screen's own
+  warm/red Color Filter is applied (a warm fill blends into the tint). Also
+  `PanelEvidence` (renders panel PNGs via NSHostingView + `cacheDisplay` —
+  `ImageRenderer` stubs AppKit controls).
+- Popover dismissal: behavior is **`.applicationDefined`, not `.transient`**.
+  A transient popover also auto-closes whenever this accessory (`LSUIElement`)
+  app *resigns active* — which is easily lost and reads as "closed when I moved
+  the mouse away". `AppDelegate` instead installs a global mouse-down monitor
+  (outside click) + a local Esc monitor while open, so it dismisses only on an
+  explicit outside click or Esc.
 - `MenuBarIcon.swift` — programmatic monochrome template status icon.
 - `tools/make-appicon.swift` — renders the `.icns` iconset; run by `bundle.sh`.
 - `--render-panel <dir>` CLI regenerates `docs/evidence/cfs-ui/` screenshots.

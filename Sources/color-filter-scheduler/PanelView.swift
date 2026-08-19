@@ -1,11 +1,36 @@
 import SwiftUI
 
+/// Shared palette for the panel. Tuned near-black to match the captain's
+/// preferred "Left" menu-bar app (a deep, neutral, near-black surface rather
+/// than a medium grey). The Run/Pause colors are deliberately chosen to stay
+/// legible even while the screen's own warm/red Color Filter is applied:
+/// emerald (a cool hue) for ON never blends into a red-tinted screen the way a
+/// warm orange fill did, and the label is always pure white.
+enum Palette {
+    /// Near-black panel body (~#111214).
+    static let panel = Color(red: 0.067, green: 0.070, blue: 0.078)
+    /// Hairline separators / subtle borders on the dark surface.
+    static let hairline = Color.white.opacity(0.08)
+
+    /// Run/Pause — ON (filter running): a filled emerald block.
+    static let runOn = Color(red: 0.17, green: 0.70, blue: 0.44)
+    static let runOnBorder = Color(red: 0.34, green: 0.88, blue: 0.58).opacity(0.55)
+    static let runOnDot = Color(red: 0.80, green: 1.0, blue: 0.88)
+    /// Run/Pause — OFF (filter paused): a faint, outlined neutral block.
+    static let controlFill = Color.white.opacity(0.055)
+    static let controlBorder = Color.white.opacity(0.10)
+
+    /// Warm amber used only for inline warning text (not a state indicator).
+    static let warn = Color(red: 0.96, green: 0.68, blue: 0.34)
+}
+
 /// The custom dark popover panel, styled after the captain's preferred "Left"
-/// menu-bar app: a rounded dark panel, a clean header (glyph + name + muted
-/// status, a small pill top-right), generous spacing, and a subtle footer.
+/// menu-bar app: a rounded near-black panel, a clean header (glyph + name, a
+/// small pill top-right), generous spacing, and a subtle footer. The big
+/// Run/Pause button — not a text subtitle — is the on/off state indicator.
 ///
 /// Two pages live here — the tiny front panel and a Settings page — switched by
-/// local state, so the whole thing stays a single transient popover.
+/// local state, so the whole thing stays a single popover.
 struct PanelView: View {
     @ObservedObject var model: AppModel
     var quit: () -> Void
@@ -25,7 +50,7 @@ struct PanelView: View {
             }
         }
         .frame(width: 288)
-        .background(Color.black.opacity(0.001))   // let the popover's dark material show
+        .background(Palette.panel)                 // near-black body, "Left"-style
         .onAppear { model.refresh() }
     }
 }
@@ -41,13 +66,9 @@ private struct FrontPage: View {
             // Header row: glyph + name + status, gear pill top-right.
             HStack(alignment: .center, spacing: 10) {
                 FilterGlyph().frame(width: 22, height: 22)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Color Filter")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(model.statusText)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
+                // Just the name — the Run/Pause button below IS the state indicator.
+                Text("Color Filter")
+                    .font(.system(size: 14, weight: .semibold))
                 Spacer(minLength: 8)
                 Button(action: openSettings) {
                     Image(systemName: "slider.horizontal.3")
@@ -76,8 +97,9 @@ private struct FrontPage: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text(model.locationSummary)
+                    Text(model.locationDisplay)
                         .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.tertiary)
@@ -91,31 +113,43 @@ private struct FrontPage: View {
     }
 }
 
+/// The one control. State is conveyed by an obvious color difference —
+/// emerald filled block when the filter is ON, faint outlined block when OFF —
+/// chosen so it never washes out under the screen's own warm/red Color Filter
+/// (emerald is a cool hue, not the tint's hue) and so the label stays pure
+/// white (always high-contrast) in both states.
 private struct RunPauseButton: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
+        let on = model.filterOn
         Button(action: { model.toggleRun() }) {
-            HStack(spacing: 8) {
-                Image(systemName: model.filterOn ? "pause.fill" : "play.fill")
+            HStack(spacing: 9) {
+                Image(systemName: on ? "pause.fill" : "play.fill")
                     .font(.system(size: 12, weight: .bold))
-                Text(model.filterOn ? "Pause" : "Run")
+                Text(on ? "Pause" : "Run")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Text(model.filterOn ? "Filter on" : "Filter off")
-                    .font(.system(size: 11))
-                    .foregroundStyle(model.filterOn ? Color.white.opacity(0.8) : .secondary)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(on ? Palette.runOnDot : Color.white.opacity(0.28))
+                        .frame(width: 6, height: 6)
+                    Text(on ? "Filter on" : "Filter off")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(on ? Color.white.opacity(0.92) : Color.white.opacity(0.45))
+                }
             }
+            .foregroundStyle(Color.white)   // icon + primary label: always legible
             .padding(.horizontal, 14).padding(.vertical, 11)
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(model.filterOn
-                          ? AnyShapeStyle(LinearGradient(colors: [Color.orange, Color.pink],
-                                                         startPoint: .leading, endPoint: .trailing))
-                          : AnyShapeStyle(Color.primary.opacity(0.08)))
+                    .fill(on ? Palette.runOn : Palette.controlFill)
             )
-            .foregroundStyle(model.filterOn ? Color.white : Color.primary)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(on ? Palette.runOnBorder : Palette.controlBorder, lineWidth: 1)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -128,6 +162,10 @@ private struct SettingsPage: View {
     @ObservedObject var model: AppModel
     var back: () -> Void
     var quit: () -> Void
+    /// Whether the lat/long fine-tune fields start expanded (used by evidence
+    /// rendering so a single screenshot shows both the city field and the
+    /// retained fine-tune fields).
+    var locationExpanded: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -149,7 +187,7 @@ private struct SettingsPage: View {
 
             VStack(alignment: .leading, spacing: 18) {
                 StrengthControl(model: model)
-                LocationControl(model: model)
+                LocationControl(model: model, initiallyExpanded: locationExpanded)
                 AutomaticControl(model: model)
             }
             .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 14)
@@ -192,31 +230,72 @@ private struct StrengthControl: View {
     }
 }
 
+/// Location = type a city (primary, geocoded via CoreLocation) with the precise
+/// lat/long fields retained as a collapsible fine-tune / offline override.
 private struct LocationControl: View {
     @ObservedObject var model: AppModel
+    @State private var showFineTune: Bool
+
+    init(model: AppModel, initiallyExpanded: Bool = false) {
+        self.model = model
+        _showFineTune = State(initialValue: initiallyExpanded)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Location").font(.system(size: 12, weight: .medium))
                 Spacer()
-                Text("latitude, longitude")
+                Button(showFineTune ? "Hide lat/long" : "Set lat/long") {
+                    withAnimation(.easeInOut(duration: 0.12)) { showFineTune.toggle() }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.tertiary)
+            }
+
+            // Primary input: type a city, resolve to coordinates.
+            HStack(spacing: 8) {
+                TextField("City — e.g. Lisbon", text: $model.cityText)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
+                    .onSubmit { model.resolveCity() }
+                Button(action: { model.resolveCity() }) {
+                    if model.isGeocoding {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Find")
+                    }
+                }
+                .controlSize(.regular)
+                .disabled(model.isGeocoding)
+            }
+
+            if !model.geocodeMessage.isEmpty {
+                Text(model.geocodeMessage)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(model.lastGeocodeOK ? Color.secondary : Palette.warn)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Fine-tune / offline override: the precise lat/long fields, retained.
+            if showFineTune {
+                HStack(spacing: 8) {
+                    TextField("Lat", text: $model.latitudeText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12)).monospacedDigit()
+                        .multilineTextAlignment(.center)
+                    TextField("Lon", text: $model.longitudeText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12)).monospacedDigit()
+                        .multilineTextAlignment(.center)
+                    Button("Set") { model.applyLocation() }
+                        .controlSize(.regular)
+                }
+                Text("Precise override — works offline, no geocoding.")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
-            HStack(spacing: 8) {
-                TextField("Lat", text: $model.latitudeText)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12)).monospacedDigit()
-                    .multilineTextAlignment(.center)
-                TextField("Lon", text: $model.longitudeText)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12)).monospacedDigit()
-                    .multilineTextAlignment(.center)
-                Button("Set") { model.applyLocation() }
-                    .controlSize(.regular)
-            }
-            .onSubmit { model.applyLocation() }
         }
     }
 }
@@ -252,25 +331,37 @@ enum PanelEvidence {
         // Temporarily seed a location in THIS binary's defaults (isolated from the
         // installed app's domain) so the shots aren't empty; restored afterwards.
         let savedLat = Settings.shared.latitude, savedLon = Settings.shared.longitude
+        let savedName = Settings.shared.locationName
         Settings.shared.latitude = 38.72; Settings.shared.longitude = -9.14
-        defer { Settings.shared.latitude = savedLat; Settings.shared.longitude = savedLon }
+        Settings.shared.locationName = "Lisbon, Portugal"
+        defer {
+            Settings.shared.latitude = savedLat; Settings.shared.longitude = savedLon
+            Settings.shared.locationName = savedName
+        }
 
         let onModel = AppModel()
         onModel.filterOn = true
         onModel.strength = 0.62
         onModel.automationEnabled = false
         onModel.latitudeText = "38.72"; onModel.longitudeText = "-9.14"
+        onModel.cityText = "Lisbon, Portugal"
+        onModel.geocodeMessage = "Lisbon, Portugal · 38.7223, -9.1393"
+        onModel.lastGeocodeOK = true
         onModel.statusText = "On"
 
         let offModel = AppModel()
         offModel.filterOn = false
         offModel.automationEnabled = true
         offModel.latitudeText = "38.72"; offModel.longitudeText = "-9.14"
+        offModel.cityText = "Lisbon, Portugal"
+        offModel.geocodeMessage = "Lisbon, Portugal · 38.7223, -9.1393"
+        offModel.lastGeocodeOK = true
         offModel.statusText = "Off · auto"
 
         save(FrontPage(model: onModel, openSettings: {}), "\(dir)/panel-front-running.png")
         save(FrontPage(model: offModel, openSettings: {}), "\(dir)/panel-front-paused.png")
-        save(SettingsPage(model: onModel, back: {}, quit: {}), "\(dir)/panel-settings.png")
+        save(SettingsPage(model: onModel, back: {}, quit: {}, locationExpanded: true),
+             "\(dir)/panel-settings.png")
         MenuBarIcon.writeEvidence(to: "\(dir)/menubar-icon-light-dark.png")
         print("wrote panel evidence -> \(dir)")
     }
@@ -282,7 +373,7 @@ enum PanelEvidence {
     private static func save<V: View>(_ view: V, _ path: String) {
         let wrapped = view
             .frame(width: 288)
-            .background(Color(nsColor: NSColor(calibratedRed: 0.14, green: 0.13, blue: 0.16, alpha: 1)))
+            .background(Color(nsColor: NSColor(calibratedRed: 0.067, green: 0.070, blue: 0.078, alpha: 1)))
 
         let host = NSHostingView(rootView: wrapped)
         host.appearance = NSAppearance(named: .darkAqua)

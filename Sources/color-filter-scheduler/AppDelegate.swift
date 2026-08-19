@@ -10,7 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var popover: NSPopover!
     private var model: AppModel!
     private var timer: Timer?
-    private var monitor: Any?
+    // Event monitors installed only while the popover is open, so it dismisses
+    // on an explicit outside click or Esc — never on mere mouse-leave.
+    private var globalClickMonitor: Any?
+    private var localKeyMonitor: Any?
 
     // Reconcile cadence. Kept modest so transitions land within a few minutes of
     // the true sunrise/sunset without busy-looping.
@@ -67,7 +70,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildPopover() {
         let pop = NSPopover()
-        pop.behavior = .transient      // closes on outside click
+        // `.applicationDefined` (not `.transient`): a transient popover also
+        // auto-closes whenever this accessory app *resigns active* — which is
+        // exactly what made the panel appear to close "when the mouse moved
+        // away", since an LSUIElement's active state is easily lost. We take
+        // full control instead: the popover never auto-closes; we dismiss it
+        // ourselves only on an explicit outside click or the Esc key (see the
+        // monitors in `openPopover`), so it stays open until the user means it.
+        pop.behavior = .applicationDefined
         pop.animates = true
         pop.appearance = NSAppearance(named: .darkAqua)   // "Left"-style dark panel
         let root = PanelView(model: model, quit: { NSApp.terminate(nil) })
@@ -76,16 +86,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func togglePopover(_ sender: Any?) {
-        guard let button = statusItem.button else { return }
         if popover.isShown {
-            popover.performClose(sender)
+            closePopover()
         } else {
-            model.refresh()
-            updateStatusAppearance()
-            // Activate so the popover's text fields can take keyboard focus.
-            NSApp.activate(ignoringOtherApps: true)
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+            openPopover()
         }
+    }
+
+    private func openPopover() {
+        guard let button = statusItem.button else { return }
+        model.refresh()
+        updateStatusAppearance()
+        // Activate so the popover's text fields can take keyboard focus.
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+
+        // Outside click (in any other app or the desktop) → dismiss. A global
+        // monitor only sees events destined for *other* apps, so clicks inside
+        // the popover or on our status item never trigger it.
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            self?.closePopover()
+        }
+        // Esc → dismiss. Local monitor swallows the key so it doesn't beep.
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            if event.keyCode == 53 {   // Esc
+                self?.closePopover()
+                return nil
+            }
+            return event
+        }
+    }
+
+    private func closePopover() {
+        if let m = globalClickMonitor { NSEvent.removeMonitor(m); globalClickMonitor = nil }
+        if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
+        if popover.isShown { popover.performClose(nil) }
     }
 }
