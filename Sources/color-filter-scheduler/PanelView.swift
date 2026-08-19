@@ -67,7 +67,7 @@ private struct FrontPage: View {
             HStack(alignment: .center, spacing: 10) {
                 FilterGlyph().frame(width: 22, height: 22)
                 // Just the name — the Run/Pause button below IS the state indicator.
-                Text("Night Walker")
+                Text(Product.name)
                     .font(.system(size: 14, weight: .semibold))
                 Spacer(minLength: 8)
                 Button(action: openSettings) {

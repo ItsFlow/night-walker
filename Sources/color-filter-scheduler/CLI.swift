@@ -188,6 +188,7 @@ enum CLI {
         }
 
         print("selftest: panel architecture")
+        check("product name is Night Walker", Product.name == "Night Walker")
         // Regression for cfs-ui3: raw global mouse monitoring is not a reliable
         // dismissal boundary for an LSUIElement app. The delegate must own a key
         // panel instead, with no popover/global-click-monitor state left behind.

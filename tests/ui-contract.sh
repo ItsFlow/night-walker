@@ -42,8 +42,6 @@ require_absent 'Text("Location")' 'no Location heading'
 require_absent 'Text("Settings")' 'no Settings text label'
 require_absent 'Follow the sun' 'no Automatic explanation'
 require_absent 'Precise override' 'no latitude/longitude explanation'
-require_present 'Text("Night Walker")' 'panel title is Night Walker'
-require_absent 'Text("Color Filter")' 'old panel title removed'
 require_present 'TextField("Your location"' 'location label is an in-field placeholder'
 require_present 'Image(systemName: "gearshape")' 'settings affordance is a gear icon'
 

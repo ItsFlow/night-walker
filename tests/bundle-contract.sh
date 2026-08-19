@@ -2,9 +2,7 @@
 # bundle-contract: ./bundle.sh produces a signed .app with the historical
 # identifier com.flo.color-filter-scheduler.
 #
-# Universal (x86_64 + arm64) is asserted when lipo -info contains both
-# architectures. A single-arch bundle is a skip/note, not a failure, unless
-# bundle.sh itself already builds both via lipo — then both are required.
+# The shipped executable must be universal (x86_64 + arm64).
 #
 # Does not install. Does not touch ~/Applications.
 set -euo pipefail
@@ -77,11 +75,6 @@ fi
 LIPO_INFO="$(lipo -info "$EXEC" 2>/dev/null || echo "")"
 echo "note: $LIPO_INFO"
 
-wants_universal=0
-if grep -q 'x86_64' bundle.sh && grep -q 'arm64' bundle.sh && grep -q 'lipo' bundle.sh; then
-    wants_universal=1
-fi
-
 has_x86=0
 has_arm=0
 case "$LIPO_INFO" in *x86_64*) has_x86=1 ;; esac
@@ -89,10 +82,8 @@ case "$LIPO_INFO" in *arm64*) has_arm=1 ;; esac
 
 if [ "$has_x86" = "1" ] && [ "$has_arm" = "1" ]; then
     ok "universal binary (x86_64 + arm64)"
-elif [ "$wants_universal" = "1" ]; then
-    fail "bundle.sh builds universal via lipo but $EXEC is not x86_64+arm64"
 else
-    echo "note: single-architecture bundle; universal is asserted when lipo -info contains both (x86_64 and arm64)"
+    fail "$EXEC is not universal x86_64+arm64"
 fi
 
 if [ "$failures" -ne 0 ]; then
