@@ -19,19 +19,34 @@ tint, protanopia, etc.) is preserved.
   an internal timer (every ~5 min) and immediately on wake from sleep — robust
   across sleep/wake, reboots, DST, and seasonal drift, with no fixed alarm times.
 
-## The menu-bar UI (exactly three controls)
+## The menu-bar UI
 
-- **Automatic (sunset → sunrise)** — the master switch for the automation. ON:
-  the app manages Color Filters on the solar schedule. OFF: it stops managing
-  them and leaves the filter as-is.
-- **Strength** — a 0–100% slider that sets the real macOS Color Filters
-  intensity (the "Color Tint" / single-color intensity, which is the configured
-  filter type on this Mac). Changes apply live.
-- **Location** — latitude / longitude entry for the sunrise/sunset math. The
-  menu also shows today's computed sunrise/sunset and what the app wants to do.
+A **custom dark rounded popover** (SwiftUI in an `NSPopover`), not a stock menu.
+See `docs/evidence/cfs-ui/` for screenshots.
 
-On/Off and location are saved in the app's own `UserDefaults`. Strength lives in
-the OS Color Filters preference itself, so it persists inherently.
+**Front panel** — deliberately tiny:
+- **Header** — a day/night glyph, the name, and a one-line status (`On` /
+  `Off` / `Off · auto`), plus a settings pill.
+- **Run / Pause** — the primary control. **Run** turns Color Filters **ON**
+  live (the screen visibly changes); **Pause** turns them **OFF** live.
+- **Location** — shows the current coordinates; tap to open the editor.
+
+**Settings** (behind the header pill):
+- **Strength** — a 0–100% slider for the real macOS Color Filters intensity
+  (the "Color Tint" / single-color intensity). Applies live.
+- **Location** — latitude / longitude fine-tune.
+- **Automatic (sunset → sunrise)** — master switch for solar automation.
+- **Quit**.
+
+**Manual Run/Pause vs. Automatic.** With Automatic **off** (the default), the
+filter follows only the Run/Pause button and the reconcile timer is inert. With
+Automatic **on**, the solar scheduler owns the filter (turning it on reconciles
+immediately); a manual Run/Pause is then a temporary override until the next
+reconcile or sunrise/sunset transition.
+
+Automation on/off and location are saved in the app's own `UserDefaults`.
+Strength lives in the OS Color Filters preference itself, so it persists
+inherently.
 
 ## How it works
 
@@ -61,7 +76,8 @@ swift build -c release                 # binary at .build/release/color-filter-s
 
 This builds and bundles the app, installs it to `~/Applications`, writes a
 per-user LaunchAgent that launches it at login, and starts it now. Then click the
-menu-bar icon, enter your location, and turn on **Automatic**.
+menu-bar icon; use **Run** to try the filter, and open **Settings** (header pill)
+to set your location and turn on **Automatic**.
 
 ## Test manually (headless commands)
 
@@ -98,7 +114,8 @@ The login-item agent writes to `~/Library/Logs/color-filter-scheduler.log`
 
 ## Requirements
 
-- macOS 11+ with Command Line Tools (`swiftc` / `swift`). Apple Silicon or Intel.
+- macOS 13+ with Command Line Tools (`swiftc` / `swift`). Apple Silicon or Intel.
+  (The SwiftUI popover UI sets the deployment target to macOS 13.)
 - Choose a Color Filters *type* once in System Settings → Accessibility →
   Display → Color Filters. This app flips the master and adjusts intensity; it
   doesn't pick the type.

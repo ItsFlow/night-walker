@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 /// Headless command-line mode used for testing and evidence. It deliberately
 /// takes location explicitly on the command line and NEVER reads or writes the
@@ -78,6 +79,12 @@ enum CLI {
                 print("decision=none (fail-safe: engine will do nothing)")
             }
             return 0
+        case "--render-panel":
+            // Render the redesigned panel to PNGs for evidence. Read-only w.r.t.
+            // the live filter (assigns display values in memory only).
+            let dir = opts["dir"] ?? opts["_pos0"] ?? "docs/evidence/cfs-ui"
+            renderPanel(dir)
+            return 0
         case "--engine-reconcile":
             let before = ColorFilters.isEnabled
             let changed = ReconcileEngine.reconcile()
@@ -108,6 +115,15 @@ enum CLI {
             }
         }
         return out
+    }
+
+    private static func renderPanel(_ dir: String) {
+        // ImageRenderer needs an initialized AppKit app on the main thread.
+        _ = NSApplication.shared
+        NSApp.setActivationPolicy(.accessory)
+        MainActor.assumeIsolated {
+            PanelEvidence.render(to: dir)
+        }
     }
 
     private static func boolArg(_ s: String) -> Bool? {
@@ -143,6 +159,8 @@ enum CLI {
                                         print sunrise/sunset + on/off decision (read-only)
           --reconcile --lat D --lon D [--apply]
                                         as --decide; with --apply, set the live state
+          --render-panel [dir]          render the UI panels to PNGs (read-only;
+                                        default dir: docs/evidence/cfs-ui)
           --help                        this help
         """)
     }

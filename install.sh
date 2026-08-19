@@ -44,9 +44,9 @@ echo "  Plist : $PLIST"
 echo "  Logs  : $LOG_DIR/color-filter-scheduler.log"
 echo
 echo "Open the menu-bar icon, then:"
-echo "  1. Enter your latitude/longitude under 'Location' and click Set."
-echo "  2. Turn on 'Automatic (sunset → sunrise)'."
-echo "  3. Adjust 'Strength' to taste."
+echo "  1. Press 'Run' to try the filter live (or 'Pause' to turn it off)."
+echo "  2. Open 'Settings' (the header pill) to set latitude/longitude,"
+echo "     adjust 'Strength', and turn on 'Automatic (sunset → sunrise)'."
 echo
 echo "To change the reconcile cadence, edit reconcileInterval in the source"
 echo "(Sources/color-filter-scheduler/AppDelegate.swift) and re-run this script."

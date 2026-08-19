@@ -5,7 +5,7 @@ import PackageDescription
 // Builds with `swift build` on Command Line Tools (no full Xcode required).
 let package = Package(
     name: "color-filter-scheduler",
-    platforms: [.macOS(.v11)],
+    platforms: [.macOS(.v13)],
     targets: [
         // Thin C shim that declares the MediaAccessibility SPI we call.
         // The symbols themselves live in the system framework (linked below).

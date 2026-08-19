@@ -4,9 +4,23 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 ## What this is
 An `LSUIElement` macOS menu-bar app that turns Accessibility → Display → Color
-Filters ON at sunset / OFF at sunrise, with three controls (On/Off automation,
-Strength, Location). CLT-only (no Xcode), zero third-party deps. See `README.md`
-and `EVIDENCE.md`.
+Filters ON at sunset / OFF at sunrise. CLT-only (no Xcode), zero third-party
+deps. See `README.md` and `EVIDENCE.md`.
+
+## UI layer (SwiftUI popover, "Left" style)
+The presentation is a custom dark `NSPopover` hosting SwiftUI, **not** an
+`NSMenu`. Deployment target is **macOS 13** (Package.swift + bundle.sh
+`LSMinimumSystemVersion`) for SwiftUI + `ImageRenderer`. Files:
+- `AppModel.swift` — `ObservableObject` bridge; the UI never calls the engine
+  directly. Documents the manual-Run/Pause vs. Automatic override rule.
+- `PanelView.swift` — front page (Run/Pause + Location) and Settings page
+  (Strength, lat/lon, Automatic, Quit). Also `PanelEvidence` (renders panel PNGs
+  via NSHostingView + `cacheDisplay` — `ImageRenderer` stubs AppKit controls).
+- `MenuBarIcon.swift` — programmatic monochrome template status icon.
+- `tools/make-appicon.swift` — renders the `.icns` iconset; run by `bundle.sh`.
+- `--render-panel <dir>` CLI regenerates `docs/evidence/cfs-ui/` screenshots.
+Any UI/engine testing MUST restore Color Filters to the pre-test state (see
+below); `--render-panel` is read-only w.r.t. the live filter.
 
 ## Build / run
 - `swift build -c release` → `.build/release/color-filter-scheduler`.

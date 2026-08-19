@@ -28,6 +28,16 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BUILT" "$APP/Contents/MacOS/$EXECUTABLE"
 
+echo "==> Rendering app icon (.icns)"
+ICONSET="$(mktemp -d)/AppIcon.iconset"
+swift "$REPO_DIR/tools/make-appicon.swift" "$ICONSET"
+if iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"; then
+    ICON_KEY='    <key>CFBundleIconFile</key>        <string>AppIcon</string>'
+else
+    echo "warning: iconutil failed; bundling without .icns" >&2
+    ICON_KEY=''
+fi
+
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -40,7 +50,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
     <key>CFBundleVersion</key>         <string>$VERSION</string>
     <key>CFBundleShortVersionString</key> <string>$VERSION</string>
     <key>CFBundlePackageType</key>     <string>APPL</string>
-    <key>LSMinimumSystemVersion</key>  <string>11.0</string>
+$ICON_KEY
+    <key>LSMinimumSystemVersion</key>  <string>13.0</string>
     <!-- Menu-bar-only agent: no Dock icon, no main window. -->
     <key>LSUIElement</key>             <true/>
     <key>NSHighResolutionCapable</key> <true/>
