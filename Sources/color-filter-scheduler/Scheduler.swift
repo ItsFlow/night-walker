@@ -11,6 +11,14 @@ enum Scheduler {
         var reason: String
     }
 
+    /// Fail-closed coordinate check at the CLI / Settings boundary. Does not
+    /// change the NOAA formula; garbage in must not produce a schedule.
+    static func isValidCoordinate(latitude: Double, longitude: Double) -> Bool {
+        latitude.isFinite && longitude.isFinite
+            && latitude >= -90 && latitude <= 90
+            && longitude >= -180 && longitude <= 180
+    }
+
     /// Positive `sunriseOffsetMinutes` shifts the morning OFF transition later;
     /// positive `sunsetOffsetMinutes` shifts the evening ON transition later.
     static func decide(latitude: Double,

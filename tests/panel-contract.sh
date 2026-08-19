@@ -4,10 +4,21 @@ set -eu
 source_file="Sources/color-filter-scheduler/AppDelegate.swift"
 failures=0
 
+# rg is nicer locally; grep -F is what GitHub Actions macos-latest has.
+grep_fixed() {
+    pattern="$1"
+    file="$2"
+    if command -v rg >/dev/null 2>&1; then
+        rg -q --fixed-strings "$pattern" "$file"
+    else
+        grep -F -q "$pattern" "$file"
+    fi
+}
+
 require_absent() {
     pattern="$1"
     description="$2"
-    if rg -q --fixed-strings "$pattern" "$source_file"; then
+    if grep_fixed "$pattern" "$source_file"; then
         echo "FAIL: $description"
         failures=$((failures + 1))
     else
@@ -18,7 +29,7 @@ require_absent() {
 require_present() {
     pattern="$1"
     description="$2"
-    if rg -q --fixed-strings "$pattern" "$source_file"; then
+    if grep_fixed "$pattern" "$source_file"; then
         echo "ok: $description"
     else
         echo "FAIL: $description"

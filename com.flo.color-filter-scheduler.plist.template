@@ -21,6 +21,13 @@
     <key>Label</key>
     <string>com.flo.color-filter-scheduler</string>
 
+    <!-- Groups this agent with the Night Walker app in launchctl UI.
+         Bundle id is historical; user-facing name is Night Walker. -->
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>com.flo.color-filter-scheduler</string>
+    </array>
+
     <key>ProgramArguments</key>
     <array>
         <string>__APP_BINARY__</string>

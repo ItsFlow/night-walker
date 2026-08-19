@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Headless suite
+        # Skip universal packaging here; the bundle job covers lipo + codesign.
+        # Skip --render-panel (needs a GUI session).
+        run: RUN_BUNDLE=0 tests/run.sh
+
+  bundle:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Universal bundle + ad-hoc sign
+        run: ./bundle.sh
+
+      - name: Verify lipo + codesign
+        run: |
+          APP="dist/Night Walker.app"
+          BIN="$APP/Contents/MacOS/color-filter-scheduler"
+          echo "==> lipo -info"
+          lipo -info "$BIN"
+          lipo -info "$BIN" | grep -q 'x86_64'
+          lipo -info "$BIN" | grep -q 'arm64'
+          echo "==> codesign --verify"
+          codesign --verify --verbose=1 "$APP"
+          echo "==> codesign identifier"
+          codesign -d --verbose=2 "$APP" 2>&1 | grep -F 'Identifier=com.flo.color-filter-scheduler'

@@ -67,7 +67,7 @@ private struct FrontPage: View {
             HStack(alignment: .center, spacing: 10) {
                 FilterGlyph().frame(width: 22, height: 22)
                 // Just the name — the Run/Pause button below IS the state indicator.
-                Text("Color Filter")
+                Text("Night Walker")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer(minLength: 8)
                 Button(action: openSettings) {
@@ -315,17 +315,8 @@ enum PanelEvidence {
     static func render(to dir: String) {
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        // Temporarily seed a location in THIS binary's defaults (isolated from the
-        // installed app's domain) so the shots aren't empty; restored afterwards.
-        let savedLat = Settings.shared.latitude, savedLon = Settings.shared.longitude
-        let savedName = Settings.shared.locationName
-        Settings.shared.latitude = 38.72; Settings.shared.longitude = -9.14
-        Settings.shared.locationName = "Lisbon, Portugal"
-        defer {
-            Settings.shared.latitude = savedLat; Settings.shared.longitude = savedLon
-            Settings.shared.locationName = savedName
-        }
-
+        // In-memory display values only. Never write Settings.shared — the
+        // bundled binary shares the captain/friend prefs domain.
         let onModel = AppModel()
         onModel.filterOn = true
         onModel.strength = 0.62

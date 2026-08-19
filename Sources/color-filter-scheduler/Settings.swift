@@ -65,7 +65,7 @@ final class Settings {
 
     var hasValidLocation: Bool {
         guard let lat = latitude, let lon = longitude else { return false }
-        return lat.isFinite && lon.isFinite && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180
+        return Scheduler.isValidCoordinate(latitude: lat, longitude: lon)
     }
 
     // Returns nil if the key is unset in every domain; otherwise the value,

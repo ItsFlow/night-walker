@@ -1,120 +1,112 @@
-# color-filter-scheduler
+# Night Walker
 
-A small, dependency-free macOS **menu-bar app** that automatically turns the
-Accessibility → Display → **Color Filters** master toggle **ON at sunset** and
-**OFF at sunrise** (Night Shift–style), for a single personal Mac — with a tiny
-menu-bar UI to control it.
+A small macOS menu-bar app that turns Accessibility → Display → **Color Filters**
+**ON at sunset** and **OFF at sunrise**. Night Shift for whatever filter you
+already picked — grayscale, color tint, color-vision correction, etc.
 
-It flips the master on/off and adjusts the effect **strength**. It never changes
-the filter *type* — whatever you chose in System Settings (grayscale, color
-tint, protanopia, etc.) is preserved.
+It flips the master on/off and the strength slider. It never changes the filter
+*type*. Choose that once in System Settings.
 
-- **Menu-bar only.** `LSUIElement` agent: an icon in the menu bar, no Dock icon,
-  no main window.
-- **Zero third-party dependencies.** Pure Swift + system frameworks (AppKit +
-  MediaAccessibility).
-- **Builds with `swift build` on Command Line Tools** — no full Xcode, no
-  `.xcodeproj`.
-- **Self-correcting.** The app reconciles the live state to the solar schedule on
-  an internal timer (every ~5 min) and immediately on wake from sleep — robust
-  across sleep/wake, reboots, DST, and seasonal drift, with no fixed alarm times.
+The name on the panel, in the Finder, and on the disk image is **Night Walker**.
+The bundle id `com.flo.color-filter-scheduler` is historical — leftover from
+the first working name, kept so existing installs and settings keep working.
 
-## The menu-bar UI
+## For friends (you have the DMG)
 
-A **custom dark rounded key panel** (SwiftUI in a borderless `NSPanel`), not a
-stock menu. See `docs/evidence/cfs-ui3/` for current screenshots.
+**Needs:** macOS 13 or later, Intel or Apple Silicon. You do **not** need Xcode
+or Command Line Tools.
 
-**Front panel** — deliberately tiny:
-- **Header** — a day/night glyph, the name, and a bare settings gear.
-- **Run / Pause** — the primary control. **Run** turns Color Filters **ON**
-  live (the screen visibly changes); **Pause** turns them **OFF** live.
-- A compact location row opens the editor.
+This is not on the App Store and it is not notarized. macOS will warn the first
+time because the app is only ad-hoc signed (the free, no-developer-account
+signature). That's expected.
 
-**Settings** (behind the gear):
-- A 0–100% slider for the real macOS Color Filters intensity. Applies live.
-- A single city field (Apple geocoding) with collapsible latitude / longitude
-  fine-tune fields.
-- **Automatic (sunset → sunrise)** — master switch for solar automation.
-- **Quit**.
+1. Open `NightWalker-1.0.0.dmg`.
+2. Drag **Night Walker** onto **Applications**.
+3. Eject the disk image.
+4. In Applications, **right-click Night Walker → Open → Open**. (A regular
+   double-click may be blocked by Gatekeeper until you've done this once.)
+5. A small icon appears in the menu bar. Click it.
+6. Type your city, open the gear, and turn on **Automatic (sunset → sunrise)**.
 
-**Manual Run/Pause vs. Automatic.** With Automatic **off** (the default), the
-filter follows only the Run/Pause button and the reconcile timer is inert. With
-Automatic **on**, the solar scheduler owns the filter (turning it on reconciles
-immediately); a manual Run/Pause is then a temporary override until the next
-reconcile or sunrise/sunset transition.
+**Run** turns the filter on right now; **Pause** turns it off. With Automatic
+on, the solar schedule owns the filter after that — a manual Run/Pause is a
+temporary override until the next sunrise/sunset (or the next internal
+check, about every five minutes).
 
-Automation on/off and location are saved in the app's own `UserDefaults`.
-Strength lives in the OS Color Filters preference itself, so it persists
-inherently.
+To uninstall: quit from the gear menu, then drag Night Walker out of
+Applications to the Trash. If you used the builder `install.sh` (launch at
+login), run `./uninstall.sh` from a checkout instead.
 
-## How it works
+## What it looks like
 
-- **Toggling + intensity** use Apple's `MediaAccessibility.framework` SPI
-  (`MADisplayFilterPrefSetCategoryEnabled` for the master, and
-  `MADisplayFilterPrefSetSingleColorIntensity` for strength). This is the same
-  mechanism System Settings uses — the calls post the system change notification
-  that makes WindowServer apply the change to the live display. (A bare
-  `defaults write` does **not** do this.) See [`EVIDENCE.md`](EVIDENCE.md) for how
-  the exact symbols were confirmed empirically.
-- **Sunrise/sunset** is computed in pure Swift from your latitude/longitude using
-  the standard NOAA sunrise equation — no network. Polar day/night are handled
-  gracefully (all-light / all-dark).
+A dark rounded panel from the menu-bar icon, not a stock menu.
 
-## Build
+- **Front:** name, Run / Pause, a compact city row, a gear.
+- **Settings (gear):** strength 0–100% (live), city with optional lat/lon
+  fine-tune, Automatic, Quit.
+
+Automation and location are saved in the app's own settings. Strength lives in
+macOS Color Filters itself, so it persists even if you quit.
+
+## Honest caveats
+
+- Uses Apple's **private** MediaAccessibility SPI — the same calls System
+  Settings uses, so the change hits the live display. A `defaults write` does
+  not. Private SPI can break on a macOS update.
+- **Not notarized**, not App Store. First launch is right-click → Open.
+- Polar day / polar night are handled (all-light / all-dark). No network after
+  the one-time city lookup.
+
+## For builders (Command Line Tools)
+
+Needs the macOS Command Line Tools (`swiftc` / `swift`). Full Xcode is not
+required. Zero third-party dependencies.
 
 ```sh
-swift build -c release                 # binary at .build/release/color-filter-scheduler
-./bundle.sh                            # assemble + ad-hoc sign dist/Color Filter Scheduler.app
+swift build -c release                 # host-arch binary at .build/release/color-filter-scheduler
+./bundle.sh                            # universal (x86_64 + arm64) dist/Night Walker.app, ad-hoc signed
+./dmg.sh                               # dist/NightWalker-1.0.0.dmg (calls bundle.sh)
 ```
 
-## Install (to ~/Applications + launch at login)
+Launch at login (builders). Installs to `~/Applications/Night Walker.app`.
+The bundle id is still `com.flo.color-filter-scheduler`, so this **refuses**
+if `~/Applications/Color Filter Scheduler.app` is present (shared login item
+and prefs). Friends should use the DMG, not `install.sh`.
 
 ```sh
 ./install.sh
-```
-
-This builds and bundles the app, installs it to `~/Applications`, writes a
-per-user LaunchAgent that launches it at login, and starts it now. Then click the
-menu-bar icon; use **Run** to try the filter, and open Settings (the header gear)
-to set your location and turn on **Automatic**.
-
-## Test manually (headless commands)
-
-The same binary supports headless commands for testing/scripting. They take the
-location explicitly and **do not touch your saved settings**:
-
-```sh
-BIN="$HOME/Applications/Color Filter Scheduler.app/Contents/MacOS/color-filter-scheduler"
-"$BIN" --get                                   # live enabled / type / strength
-"$BIN" --set-enabled 1                          # force Color Filters on
-"$BIN" --set-enabled 0                          # force Color Filters off
-"$BIN" --set-intensity 0.5                      # set strength to 50% (live)
-"$BIN" --decide --lat 48.137 --lon 11.575       # sunrise/sunset + on/off decision (read-only)
-"$BIN" --reconcile --lat 48.137 --lon 11.575 --apply   # apply the decision
-```
-
-## Change the reconcile cadence
-
-Edit `reconcileInterval` in
-`Sources/color-filter-scheduler/AppDelegate.swift` (default 300s) and re-run
-`./install.sh`.
-
-## Uninstall
-
-```sh
-./uninstall.sh                    # unload agent, remove app, leave Color Filters OFF
+./uninstall.sh                    # unload agent, remove Night Walker, leave Color Filters OFF
 ./uninstall.sh --purge-settings   # also delete saved on/off + location
 ```
-
-## Logs
 
 The login-item agent writes to `~/Library/Logs/color-filter-scheduler.log`
 (and `.err.log`).
 
+### Headless test CLI
+
+The same binary is a small test CLI. Prefer the **`.build/`** binary, not the
+installed `.app` — `--engine-status` / `--engine-reconcile` read this process's
+UserDefaults (the bundled app is the captain/friend prefs domain).
+
+```sh
+BIN=".build/debug/color-filter-scheduler"
+"$BIN" --get                                   # live enabled / type / strength
+"$BIN" --decide --lat 48.137 --lon 11.575      # sunrise/sunset + on/off (read-only)
+"$BIN" --selftest                              # panel + solar fixtures; exit 0 = pass
+tests/run.sh                                   # full local / CI suite
+```
+
+`--set-enabled` / `--set-intensity` / `--reconcile --apply` change the live
+display (not app settings). Restore Color Filters afterward if you were testing.
+
+### Change the reconcile cadence
+
+Edit `reconcileInterval` in
+`Sources/color-filter-scheduler/AppDelegate.swift` (default 300s) and rebuild.
+
 ## Requirements
 
-- macOS 13+ with Command Line Tools (`swiftc` / `swift`). Apple Silicon or Intel.
-  (The SwiftUI panel UI sets the deployment target to macOS 13.)
-- Choose a Color Filters *type* once in System Settings → Accessibility →
-  Display → Color Filters. This app flips the master and adjusts intensity; it
-  doesn't pick the type.
+- **Friends:** macOS 13+, Intel or Apple Silicon, the DMG. No CLT.
+- **Builders:** macOS 13+ and Command Line Tools.
+- Pick a Color Filters *type* once in System Settings → Accessibility →
+  Display → Color Filters. This app flips the master and the intensity.

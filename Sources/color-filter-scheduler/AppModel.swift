@@ -171,6 +171,8 @@ final class AppModel: ObservableObject {
     /// coordinate summary, else a prompt.
     var locationDisplay: String {
         if let name = Settings.shared.locationName, !name.isEmpty { return name }
+        let typed = cityText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !typed.isEmpty { return typed }
         return locationSummary
     }
 

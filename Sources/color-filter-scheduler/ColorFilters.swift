@@ -39,6 +39,9 @@ enum ColorFilters {
     /// across launches without any extra bookkeeping.
     static var strength: Double {
         get { MADisplayFilterPrefGetSingleColorIntensity() }
-        set { MADisplayFilterPrefSetSingleColorIntensity(min(1, max(0, newValue))) }
+        set {
+            guard newValue.isFinite else { return }
+            MADisplayFilterPrefSetSingleColorIntensity(min(1, max(0, newValue)))
+        }
     }
 }
