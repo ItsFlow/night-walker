@@ -2,8 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Night Walker eclipse: a filled disc with a thin crescent on the right
-/// (no flames, spikes, or rays). Canonical silhouette is
-/// `menu-bar-mark.jpg` — a large disc and a hairline solar sliver.
+/// (no flames, spikes, or rays): a large disc and a hairline solar sliver.
 /// Keep `tools/make-appicon.swift` in sync with these numbers.
 ///
 /// Unit square, origin bottom-left, y-up. Crescent = a same-radius circle
@@ -19,7 +18,7 @@ enum EclipseMark {
 
     static let cy: CGFloat = 0.50
     static let r: CGFloat = 0.40
-    // Measured from the canonical 1024px jpg (disc r=208, gap=21, sliver=22).
+    // Tuned proportions for the disc, gap, and sliver.
     static let gapFrac: CGFloat = 0.101
     static let offsetFrac: CGFloat = 0.106
     static let minGap: CGFloat = 1.15       // points, small sizes

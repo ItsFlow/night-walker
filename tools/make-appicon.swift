@@ -22,7 +22,7 @@ try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirecto
 // Unit square, origin bottom-left, y-up. Must match EclipseMark.swift.
 let markCY: CGFloat = 0.50
 let markR: CGFloat = 0.40
-// Measured from the canonical 1024px jpg (disc r=208, gap=21, sliver=22).
+// Tuned proportions for the disc, gap, and sliver.
 let markGapFrac: CGFloat = 0.101
 let markOffsetFrac: CGFloat = 0.106
 let markMinGap: CGFloat = 1.15
