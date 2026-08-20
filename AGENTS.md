@@ -49,10 +49,11 @@ must stay under cwd.
 - `./bundle.sh` → universal (x86_64 + arm64) ad-hoc-signed `dist/Night Walker.app`
   (dual-arch `swift build` → `lipo` → hand-assembled `.app` → `codesign -s -`).
   `./dmg.sh` wraps that in `dist/NightWalker-<version>.dmg`. `install.sh` installs
-  to `~/Applications/Night Walker.app` + a launch-at-login LaunchAgent
-  (`com.flo.color-filter-scheduler.plist.template`). It **refuses** if the
+  to `~/Applications/Night Walker.app`; the signed bundled executable owns
+  launch-at-login through `SMAppService.mainApp`. It **refuses** if the
   captain's live `~/Applications/Color Filter Scheduler.app` exists (shared
-  bundle id / login-item label) unless `--replace-login-item` is passed.
+  bundle id) unless `--replace-login-item` is passed, and only removes a legacy
+  LaunchAgent whose executable path matches a recognized install.
   Do not run `install.sh` / `uninstall.sh` from a packaging or test lane.
 - The binary doubles as a headless test CLI (`--get`, `--set-enabled`,
   `--set-intensity`, `--decide/--reconcile --lat --lon [--apply] [--now ISO8601]`,

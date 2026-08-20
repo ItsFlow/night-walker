@@ -25,6 +25,10 @@ enum CLI {
         switch cmd {
         case "--help", "-h":
             printHelp(); return 0
+        case "--register-login-item":
+            return LoginItem.register() ? 0 : 1
+        case "--unregister-login-item":
+            return LoginItem.unregister() ? 0 : 1
         case "--get":
             print("enabled=\(ColorFilters.isEnabled)")
             print("type=\(ColorFilters.filterType)")
@@ -381,6 +385,10 @@ enum CLI {
           --engine-status
           --engine-reconcile            may flip live Color Filters from saved schedule
               Use a .build/ binary plus -key value; never the installed .app.
+
+        Bundled-app lifecycle:
+          --register-login-item          register the main app with SMAppService
+          --unregister-login-item        remove the SMAppService registration
 
           --render-panel [dir]          PNGs only; dir must be cwd or a subdirectory
           --help                        this help

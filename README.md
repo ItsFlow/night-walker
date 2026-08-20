@@ -73,19 +73,21 @@ swift build -c release                 # host-arch binary at .build/release/colo
 ./dmg.sh                               # dist/NightWalker-1.0.0.dmg (calls bundle.sh)
 ```
 
-Launch at login (builders). Installs to `~/Applications/Night Walker.app`.
-The bundle id is still `com.flo.color-filter-scheduler`, so this **refuses**
-if `~/Applications/Color Filter Scheduler.app` is present (shared login item
-and prefs). Friends should use the DMG, not `install.sh`.
+Installs to `~/Applications/Night Walker.app` and registers the same
+`SMAppService.mainApp` login item used by DMG installs. The bundle id is still
+`com.flo.color-filter-scheduler`, so this **refuses** if
+`~/Applications/Color Filter Scheduler.app` is present (shared login item and
+prefs). Friends should use the DMG, not `install.sh`.
 
 ```sh
 ./install.sh
-./uninstall.sh                    # unload agent, remove Night Walker, leave Color Filters OFF
+./uninstall.sh                    # unregister login item, remove app, leave Color Filters OFF
 ./uninstall.sh --purge-settings   # also delete saved on/off + location
 ```
 
-The login-item agent writes to `~/Library/Logs/color-filter-scheduler.log`
-(and `.err.log`).
+Registration and removal use the signed bundled executable. The installer
+removes a recognized legacy LaunchAgent during migration; it refuses to remove
+an unrelated plist with the same label.
 
 ### Headless test CLI
 

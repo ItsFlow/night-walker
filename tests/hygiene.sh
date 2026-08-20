@@ -48,8 +48,8 @@ else
     fail "$secret_hits file(s) matched secret-like patterns"
 fi
 
-# Absolute machine-local paths: only scripts, Package.swift, LaunchAgent
-# template, and .github — not docs/evidence historical logs.
+# Absolute machine-local paths: only scripts, Package.swift, and .github — not
+# docs/evidence historical logs.
 # Split so this scanner file does not match itself.
 user_path="$(printf '%s%s' '/Users/' 'flo')"
 path_hits=0
@@ -82,11 +82,10 @@ done < <(find . \
     -type f -name '*.sh' -print | sort)
 
 scan_path Package.swift
-scan_path com.flo.color-filter-scheduler.plist.template
 scan_path .github
 
 if [ "$path_hits" -eq 0 ]; then
-    ok "no machine-local /Users paths in scripts, Package.swift, LaunchAgent template, .github"
+    ok "no machine-local /Users paths in scripts, Package.swift, .github"
 else
     fail "$path_hits file(s) contain a machine-local /Users path"
 fi
