@@ -49,9 +49,9 @@ final class PanelHostingController<Content: View>: NSHostingController<Content> 
 }
 
 /// Menu-bar-only agent. Owns the NSStatusItem, the reconcile timer, and the
-/// custom SwiftUI key panel (the "Left"-style UI). The scheduling engine
-/// (Settings / ReconcileEngine / ColorFilters / Solar) is unchanged; this file
-/// is purely the presentation layer plus the timer/wake wiring.
+/// custom SwiftUI key panel (the "Left"-style UI). This file is the presentation
+/// layer plus the timer/wake wiring; scheduling and live filter access remain in
+/// their dedicated types.
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem!
     private var panel: StatusPanel!
