@@ -3,8 +3,9 @@
 // Renders the app's .iconset PNGs programmatically (no third-party assets, no
 // Xcode). bundle.sh runs this, then `iconutil` assembles the .icns.
 //
-// The icon mirrors the app's motif: a day/night split disc (a color filter)
-// on a soft rounded gradient tile.
+// Same Night Walker eclipse as Sources/.../EclipseMark.swift (keep the unit-
+// space numbers in sync): filled disc + two right-side prominence blades.
+// Dock/app icon tints the blades red on a dark tile; the silhouette is unchanged.
 //
 // Usage: swift tools/make-appicon.swift <output-iconset-dir>
 
@@ -18,46 +19,77 @@ guard args.count >= 2 else {
 let outDir = args[1]
 try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 
+// Unit square, origin bottom-left, y-up. Must match EclipseMark.swift.
+let markCX: CGFloat = 0.34
+let markCY: CGFloat = 0.50
+let markR: CGFloat = 0.28
+
+struct EclipseGeometry {
+    var disc: CGRect
+    var upper: [CGPoint]
+    var lower: [CGPoint]
+}
+
+func triangle(tipDeg: CGFloat, length: CGFloat,
+              fromDeg: CGFloat, toDeg: CGFloat) -> [CGPoint] {
+    func rim(_ deg: CGFloat, _ rad: CGFloat) -> CGPoint {
+        let a = deg * .pi / 180
+        return CGPoint(x: markCX + cos(a) * rad, y: markCY + sin(a) * rad)
+    }
+    let base = markR * 0.72
+    return [rim(fromDeg, base), rim(tipDeg, markR + length), rim(toDeg, base)]
+}
+
+func eclipseGeometry(in rect: CGRect) -> EclipseGeometry {
+    let pad = min(rect.width, rect.height) * 0.05
+    let box = rect.insetBy(dx: pad, dy: pad)
+    let s = min(box.width, box.height)
+    let ox = box.width > box.height ? box.minX : box.midX - s / 2
+    let oy = box.midY - s / 2
+    func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        CGPoint(x: ox + x * s, y: oy + y * s)
+    }
+    let disc = CGRect(x: ox + (markCX - markR) * s,
+                      y: oy + (markCY - markR) * s,
+                      width: 2 * markR * s,
+                      height: 2 * markR * s)
+    return EclipseGeometry(
+        disc: disc,
+        upper: triangle(tipDeg: 56, length: 0.36, fromDeg: 70, toDeg: 44)
+            .map { pt($0.x, $0.y) },
+        lower: triangle(tipDeg: 4, length: 0.38, fromDeg: 16, toDeg: -10)
+            .map { pt($0.x, $0.y) }
+    )
+}
+
+func fillPoly(_ pts: [CGPoint]) {
+    guard let first = pts.first, pts.count >= 3 else { return }
+    let p = NSBezierPath()
+    p.move(to: first)
+    for pt in pts.dropFirst() { p.line(to: pt) }
+    p.close()
+    p.fill()
+}
+
 func draw(_ px: CGFloat) -> NSImage {
     let size = NSSize(width: px, height: px)
     let img = NSImage(size: size, flipped: false) { rect in
-        // Rounded tile with a vertical warm→cool gradient.
         let corner = px * 0.22
         let tile = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
-        let bg = NSGradient(colors: [
-            NSColor(calibratedRed: 0.13, green: 0.12, blue: 0.20, alpha: 1),
-            NSColor(calibratedRed: 0.20, green: 0.16, blue: 0.28, alpha: 1),
-        ])
-        bg?.draw(in: tile, angle: -90)
+        NSColor(calibratedRed: 0.11, green: 0.11, blue: 0.12, alpha: 1).setFill()
+        tile.fill()
+        tile.addClip()
 
-        // Central day/night disc.
-        let d = px * 0.56
-        let discRect = NSRect(x: (px - d) / 2, y: (px - d) / 2, width: d, height: d)
+        let g = eclipseGeometry(in: rect)
 
-        // Left half: light (day).
-        NSGraphicsContext.saveGraphicsState()
-        NSRect(x: rect.minX, y: rect.minY, width: discRect.midX, height: px).clip()
-        NSColor(calibratedRed: 0.98, green: 0.86, blue: 0.62, alpha: 1).setFill()
-        NSBezierPath(ovalIn: discRect).fill()
-        NSGraphicsContext.restoreGraphicsState()
+        // Flares: a touch of red. Same blades as the monochrome template.
+        NSColor(calibratedRed: 0.92, green: 0.22, blue: 0.07, alpha: 1).setFill()
+        fillPoly(g.upper)
+        fillPoly(g.lower)
 
-        // Right half: tinted gradient (night).
-        NSGraphicsContext.saveGraphicsState()
-        NSRect(x: discRect.midX, y: rect.minY, width: px - discRect.midX, height: px).clip()
-        let disc = NSBezierPath(ovalIn: discRect)
-        let tint = NSGradient(colors: [
-            NSColor(calibratedRed: 0.98, green: 0.55, blue: 0.30, alpha: 1),
-            NSColor(calibratedRed: 0.40, green: 0.30, blue: 0.75, alpha: 1),
-        ])
-        disc.addClip()
-        tint?.draw(in: discRect, angle: -90)
-        NSGraphicsContext.restoreGraphicsState()
-
-        // Thin ring for definition.
-        let ring = NSBezierPath(ovalIn: discRect)
-        ring.lineWidth = max(1, px * 0.012)
-        NSColor(calibratedWhite: 1, alpha: 0.35).setStroke()
-        ring.stroke()
+        // Disc on top — black void, clean circular rim.
+        NSColor.black.setFill()
+        NSBezierPath(ovalIn: g.disc).fill()
 
         return true
     }

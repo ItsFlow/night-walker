@@ -3,9 +3,12 @@
 This file is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
 
 ## What this is
-An `LSUIElement` macOS menu-bar app that turns Accessibility → Display → Color
-Filters ON at sunset / OFF at sunrise. CLT-only (no Xcode), zero third-party
-deps. See `README.md` and `EVIDENCE.md`.
+**Night Walker**, an `LSUIElement` macOS menu-bar app that turns Accessibility →
+Display → Color Filters ON at sunset / OFF at sunrise. Display name is Night
+Walker (`CFBundleName` / `CFBundleDisplayName`, `dist/Night Walker.app`); bundle
+id `com.flo.color-filter-scheduler` is historical; executable / Swift package
+stay `color-filter-scheduler`. CLT-only (no Xcode), zero third-party deps. See
+`README.md` and `EVIDENCE.md`.
 
 ## UI layer (SwiftUI key panel, "Left" style)
 The presentation is a custom near-black, borderless `NSPanel` hosting SwiftUI,
@@ -33,16 +36,19 @@ The presentation is a custom near-black, borderless `NSPanel` hosting SwiftUI,
   inside interactions in this `LSUIElement` app. RCA:
   `docs/evidence/cfs-ui3/RCA.md`. Guarded by `--selftest` and
   `tests/panel-contract.sh`.
-- `MenuBarIcon.swift` — programmatic monochrome template status icon.
-- `tools/make-appicon.swift` — renders the `.icns` iconset; run by `bundle.sh`.
+- `MenuBarIcon.swift` / `EclipseMark.swift` — programmatic monochrome template
+  eclipse (filled disc + two right-side blades). macOS tints the template.
+- `tools/make-appicon.swift` — same silhouette for the `.icns`; flares may be
+  red on the dock tile. Run by `bundle.sh`. Keep its unit-space numbers in sync
+  with `EclipseMark.swift`.
 - `--render-panel <dir>` CLI regenerates the AppKit-backed panel screenshots
-  (current evidence: `docs/evidence/cfs-ui3/`).
+  (panel architecture: `docs/evidence/cfs-ui3/`; brand glyph: `docs/evidence/nw-brand/`).
 Any UI/engine testing MUST restore Color Filters to the pre-test state (see
 below); `--render-panel` is read-only w.r.t. the live filter.
 
 ## Build / run
 - `swift build -c release` → `.build/release/color-filter-scheduler`.
-- `./bundle.sh` → assembles + ad-hoc-signs `dist/Color Filter Scheduler.app`
+- `./bundle.sh` → assembles + ad-hoc-signs `dist/Night Walker.app`
   (the standard CLT no-Xcode pattern: release build → hand-assembled `.app` →
   `codesign -s -`). `install.sh` installs to `~/Applications` + a launch-at-login
   LaunchAgent (`com.flo.color-filter-scheduler.plist.template`).

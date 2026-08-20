@@ -25,7 +25,7 @@ enum Palette {
 }
 
 /// The custom dark key panel, styled after the captain's preferred "Left"
-/// menu-bar app: a rounded near-black panel, a clean header (glyph + name, a
+/// menu-bar app: a rounded near-black panel, a clean header (eclipse + name, a
 /// bare gear top-right), generous spacing, and a subtle footer. The big
 /// Run/Pause button — not a text subtitle — is the on/off state indicator.
 ///
@@ -65,9 +65,9 @@ private struct FrontPage: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header row: glyph + name, bare settings gear top-right.
             HStack(alignment: .center, spacing: 10) {
-                FilterGlyph().frame(width: 22, height: 22)
+                EclipseGlyph().frame(width: 22, height: 22)
                 // Just the name — the Run/Pause button below IS the state indicator.
-                Text("Color Filter")
+                Text("Night Walker")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer(minLength: 8)
                 Button(action: openSettings) {
@@ -377,29 +377,6 @@ enum PanelEvidence {
         host.cacheDisplay(in: host.bounds, to: rep)
         if let png = rep.representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: path))
-        }
-    }
-}
-
-// MARK: - Brand glyph (color-filter / day–night)
-
-/// A small circle, half tinted with a warm→cool gradient — reads as a color
-/// filter and as day/night. Used decoratively in the header.
-struct FilterGlyph: View {
-    var body: some View {
-        GeometryReader { geo in
-            let d = min(geo.size.width, geo.size.height)
-            ZStack {
-                Circle().stroke(Color.primary.opacity(0.55), lineWidth: 1.4)
-                Circle()
-                    .fill(LinearGradient(colors: [Color.orange, Color.indigo],
-                                         startPoint: .top, endPoint: .bottom))
-                    .mask(
-                        Rectangle().frame(width: d / 2, height: d)
-                            .offset(x: d / 4)
-                    )
-            }
-            .frame(width: d, height: d)
         }
     }
 }

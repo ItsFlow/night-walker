@@ -103,6 +103,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = MenuBarIcon.image()
+            button.toolTip = "Night Walker"
+            button.setAccessibilityTitle("Night Walker")
             button.action = #selector(togglePanel(_:))
             button.target = self
         }

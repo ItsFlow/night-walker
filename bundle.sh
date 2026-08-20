@@ -4,11 +4,12 @@
 # build and ad-hoc sign it. This is the standard CLT-only, no-Xcode pattern:
 # release build -> hand-assembled .app -> codesign -s -.
 #
-# Output: ./dist/Color Filter Scheduler.app
+# Output: ./dist/Night Walker.app
+# Bundle id stays com.flo.color-filter-scheduler (historical).
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_NAME="Color Filter Scheduler"
+APP_NAME="Night Walker"
 BUNDLE_ID="com.flo.color-filter-scheduler"
 EXECUTABLE="color-filter-scheduler"
 VERSION="1.0.0"
