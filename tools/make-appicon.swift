@@ -21,11 +21,12 @@ let outDir = args[1]
 try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 
 // Unit square, origin bottom-left, y-up. Must match EclipseMark.swift.
-let markCX: CGFloat = 0.48
 let markCY: CGFloat = 0.50
-let markR: CGFloat = 0.36
-let markGap: CGFloat = 0.055
-let markOffset: CGFloat = 0.065
+let markR: CGFloat = 0.40
+let markGapFrac: CGFloat = 0.055
+let markOffsetFrac: CGFloat = 0.075
+let markMinGap: CGFloat = 1.15
+let markMinOffset: CGFloat = 1.45
 
 struct EclipseGeometry {
     var disc: CGRect
@@ -34,22 +35,25 @@ struct EclipseGeometry {
 }
 
 func eclipseGeometry(in rect: CGRect) -> EclipseGeometry {
-    let pad = min(rect.width, rect.height) * 0.06
+    let pad = min(rect.width, rect.height) * 0.04
     let box = rect.insetBy(dx: pad, dy: pad)
     let s = min(box.width, box.height)
     let ox = box.midX - s / 2
     let oy = box.midY - s / 2
+    let gap = max(markMinGap / s, markGapFrac * markR)
+    let offset = max(markMinOffset / s, markOffsetFrac * markR)
+    let cx = 0.50 - (gap + offset) / 2
     func oval(cx: CGFloat, cy: CGFloat, r: CGFloat) -> CGRect {
         CGRect(x: ox + (cx - r) * s,
                y: oy + (cy - r) * s,
                width: 2 * r * s,
                height: 2 * r * s)
     }
-    let punchR = markR + markGap
+    let punchR = markR + gap
     return EclipseGeometry(
-        disc: oval(cx: markCX, cy: markCY, r: markR),
-        punch: oval(cx: markCX, cy: markCY, r: punchR),
-        outer: oval(cx: markCX + markOffset, cy: markCY, r: punchR)
+        disc: oval(cx: cx, cy: markCY, r: markR),
+        punch: oval(cx: cx, cy: markCY, r: punchR),
+        outer: oval(cx: cx + offset, cy: markCY, r: punchR)
     )
 }
 

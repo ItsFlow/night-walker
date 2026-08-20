@@ -8,12 +8,7 @@ import AppKit
 enum MenuBarIcon {
     static func image() -> NSImage {
         let size = NSSize(width: 18, height: 18)
-        let img = NSImage(size: size, flipped: false) { rect in
-            EclipseMark.fill(in: rect, color: .black)
-            return true
-        }
-        img.isTemplate = true
-        return img
+        return EclipseMark.templateImage(size: size)
     }
 
     /// A tinted (non-template) copy of the glyph, filled with `color`.
