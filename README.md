@@ -28,14 +28,19 @@ signature). That's expected.
 5. A small icon appears in the menu bar. Click it.
 6. Type your city, open the gear, and turn on **Automatic (sunset → sunrise)**.
 
+On first launch, Night Walker registers itself in **System Settings → General →
+Login Items** so scheduling resumes after logout or reboot. If macOS marks it as
+requiring approval, enable Night Walker there once.
+
 **Run** turns the filter on right now; **Pause** turns it off. With Automatic
 on, the solar schedule owns the filter after that — a manual Run/Pause is a
 temporary override until the next sunrise/sunset (or the next internal
 check, about every five minutes).
 
-To uninstall: quit from the gear menu, then drag Night Walker out of
-Applications to the Trash. If you used the builder `install.sh` (launch at
-login), run `./uninstall.sh` from a checkout instead.
+To uninstall: quit from the gear menu, disable Night Walker in **System Settings
+→ General → Login Items**, then drag Night Walker out of Applications to the
+Trash. If you used the builder `install.sh`, run `./uninstall.sh` from a checkout
+instead.
 
 ## What it looks like
 

@@ -86,6 +86,12 @@ else
     fail "$EXEC is not universal x86_64+arm64"
 fi
 
+if otool -L "$EXEC" | awk '{print $1}' | grep -q '/ServiceManagement.framework/'; then
+    ok "executable links ServiceManagement for launch at login"
+else
+    fail "executable does not link ServiceManagement"
+fi
+
 if [ "$failures" -ne 0 ]; then
     echo "bundle-contract: $failures failure(s)"
     exit 1

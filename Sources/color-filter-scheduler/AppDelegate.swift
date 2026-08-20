@@ -68,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let reconcileInterval: TimeInterval = 300  // 5 minutes
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        LoginItem.registerIfNeeded()
         model = AppModel()
         buildStatusItem()
         buildPanel()

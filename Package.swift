@@ -18,6 +18,7 @@ let package = Package(
                 .linkedFramework("MediaAccessibility"),
                 .linkedFramework("CoreFoundation"),
                 .linkedFramework("CoreLocation"),
+                .linkedFramework("ServiceManagement"),
             ]
         ),
     ]
