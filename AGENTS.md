@@ -77,6 +77,15 @@ tests use the `-key value` NSArgumentDomain (not persisted) — note it can't ta
 **negative** lat/lon (a leading `-` is parsed as a flag); use positive-hemisphere
 test locations there.
 
+## Public download page
+GitHub Pages serves `docs/` (`index.html` + `NightWalker.dmg`).
+URL: `https://itsflow.github.io/night-walker/`.
+The Download button is a relative `NightWalker.dmg` href — replace that file
+in place to ship a new build without touching the page.
+`tests/site-contract.sh` is the HTTP contract. `.github/workflows/site.yml`
+runs it. Pages source is the branch `/docs` folder (point it at `main` after
+the site branch merges). Do not rewrite the Swift app to change the page.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Night Walker</title>
+  <meta name="description" content="macOS menu-bar app. Color Filters on at sunset. Off at sunrise.">
+  <meta name="theme-color" content="#07040f">
+  <meta property="og:title" content="Night Walker">
+  <meta property="og:description" content="Color Filters on at sunset. Off at sunrise.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 32'%3E%3Cellipse cx='18' cy='18' rx='14' ry='10' fill='%23111' stroke='%23ddd' stroke-width='3'/%3E%3Cellipse cx='46' cy='18' rx='14' ry='10' fill='%23111' stroke='%23ddd' stroke-width='3'/%3E%3Cpath d='M32 12h0' stroke='%23ddd' stroke-width='3'/%3E%3Cpath d='M32 14c-2 4-2 4 0 0' stroke='%23ddd' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@55,800;55,900&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    if (new URLSearchParams(location.search).has("still") ||
+        matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      document.documentElement.classList.add("still");
+    }
+  </script>
+  <style>
+    :root {
+      --night: #07040f;
+      --paper: #f4efe6;
+      --magenta: #ff2bd6;
+      --cyan: #00eaff;
+      --orange: #ff5a1f;
+      --sun: #ffd36a;
+      --ink: #0a0a0c;
+      --ease-drop: cubic-bezier(0.22, 1.45, 0.32, 1);
+      --ease-wash: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--night);
+      color: var(--paper);
+      font-family: "Red Hat Mono", ui-monospace, Menlo, monospace;
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 100dvh;
+    }
+
+    .sky,
+    .grain,
+    .filter {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .sky-dusk {
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% 100%, #1c1238 0%, transparent 70%),
+        linear-gradient(180deg, #04020a 0%, #120c22 55%, #1a1430 100%);
+    }
+
+    .sky-vice {
+      z-index: 1;
+      opacity: 0;
+      background:
+        radial-gradient(ellipse 90% 42% at 50% 112%,
+          #fff6c8 0%,
+          var(--sun) 22%,
+          var(--orange) 48%,
+          transparent 70%),
+        linear-gradient(180deg,
+          #16082b 0%,
+          #4a0a5c 18%,
+          var(--magenta) 38%,
+          var(--orange) 58%,
+          var(--sun) 72%,
+          var(--cyan) 100%);
+      animation: wash-in 1.5s 1.2s var(--ease-wash) forwards;
+    }
+
+    .filter {
+      z-index: 6;
+      background: #c4122a;
+      mix-blend-mode: color;
+      opacity: 0;
+      animation: filter-on 1.15s 2.55s ease-out forwards;
+    }
+
+    .grain {
+      z-index: 7;
+      opacity: 0.14;
+      mix-blend-mode: overlay;
+    }
+
+    main {
+      position: relative;
+      z-index: 8;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6vh 6vw 8vh;
+      text-align: center;
+    }
+
+    .billboard {
+      position: relative;
+      width: min(96vw, 1180px);
+      margin-bottom: 4.5vh;
+    }
+
+    h1 {
+      font-family: Anybody, "Arial Narrow", Impact, sans-serif;
+      font-weight: 900;
+      font-stretch: extra-condensed;
+      font-variation-settings: "wdth" 55;
+      font-size: clamp(3.8rem, 13.5vw, 10.5rem);
+      line-height: 0.78;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      color: var(--paper);
+      text-shadow:
+        0 0 48px rgba(0, 0, 0, 0.45),
+        0 3px 0 rgba(0, 0, 0, 0.35);
+    }
+
+    h1 span {
+      display: block;
+    }
+
+    .shades {
+      position: absolute;
+      left: 50%;
+      top: -22%;
+      width: 78%;
+      height: auto;
+      transform: translate(-50%, -118%) rotate(-11deg);
+      transform-origin: 50% 40%;
+      filter: drop-shadow(0 28px 24px rgba(0, 0, 0, 0.5));
+      animation: drop-shades 0.9s 0.35s var(--ease-drop) forwards;
+      z-index: 2;
+    }
+
+    .tag {
+      font-size: clamp(0.8rem, 1.5vw, 0.95rem);
+      letter-spacing: 0.04em;
+      line-height: 1.4;
+      color: var(--paper);
+      margin-bottom: 2.4rem;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+      opacity: 0;
+      animation: fade-up 0.7s 0.9s var(--ease-wash) forwards;
+    }
+
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 52px;
+      min-width: 11.5rem;
+      padding: 0.85rem 2.1rem;
+      background: var(--paper);
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid var(--paper);
+      border-radius: 0;
+      opacity: 0;
+      animation: fade-up 0.7s 1.05s var(--ease-wash) forwards;
+    }
+
+    .cta:hover {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .cta:focus-visible {
+      outline: 3px solid var(--cyan);
+      outline-offset: 4px;
+    }
+
+    .gate {
+      margin-top: 1.15rem;
+      max-width: 34rem;
+      font-size: 0.72rem;
+      line-height: 1.45;
+      letter-spacing: 0.01em;
+      color: rgba(244, 239, 230, 0.82);
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+      opacity: 0;
+      animation: fade-up 0.7s 1.2s var(--ease-wash) forwards;
+    }
+
+    @keyframes drop-shades {
+      0%   { transform: translate(-50%, -118%) rotate(-11deg); }
+      72%  { transform: translate(-50%, 4%) rotate(2.5deg); }
+      100% { transform: translate(-50%, 0) rotate(-1.5deg); }
+    }
+
+    @keyframes wash-in {
+      to { opacity: 1; }
+    }
+
+    @keyframes filter-on {
+      to { opacity: 0.28; }
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    html.still .sky-vice,
+    html.still .filter,
+    html.still .shades,
+    html.still .tag,
+    html.still .cta,
+    html.still .gate {
+      animation: none !important;
+    }
+    html.still .sky-vice,
+    html.still .tag,
+    html.still .cta,
+    html.still .gate { opacity: 1; }
+    html.still .filter { opacity: 0.28; }
+    html.still .shades { transform: translate(-50%, 0) rotate(-1.5deg); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sky-vice,
+      .filter,
+      .shades,
+      .tag,
+      .cta,
+      .gate {
+        animation: none !important;
+      }
+      .sky-vice,
+      .tag,
+      .cta,
+      .gate { opacity: 1; }
+      .filter { opacity: 0.28; }
+      .shades { transform: translate(-50%, 0) rotate(-1.5deg); }
+    }
+
+    @media (max-width: 640px) {
+      .billboard { margin-bottom: 5vh; }
+      .shades { width: 98%; top: -2%; }
+      h1 { font-size: clamp(3.6rem, 22vw, 7rem); }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky sky-dusk" aria-hidden="true"></div>
+  <div class="sky sky-vice" aria-hidden="true"></div>
+  <svg class="grain" aria-hidden="true" preserveAspectRatio="none">
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#grain)"></rect>
+  </svg>
+  <div class="filter" aria-hidden="true"></div>
+
+  <main>
+    <div class="billboard">
+      <svg class="shades" viewBox="0 0 1000 300" role="img" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="lens" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#3a1038"/>
+            <stop offset="42%" stop-color="#ff2bd6"/>
+            <stop offset="100%" stop-color="#00eaff"/>
+          </linearGradient>
+          <linearGradient id="glint" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+            <stop offset="45%" stop-color="#ffffff" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f6f8fb"/>
+            <stop offset="45%" stop-color="#c5ced8"/>
+            <stop offset="100%" stop-color="#8e99a6"/>
+          </linearGradient>
+        </defs>
+        <path d="M8 92 L148 118" stroke="url(#chrome)" stroke-width="14" stroke-linecap="round"/>
+        <path d="M992 92 L852 118" stroke="url(#chrome)" stroke-width="14" stroke-linecap="round"/>
+        <path d="M250 78 C400 42 600 42 750 78" stroke="url(#chrome)" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <path d="M430 128 C500 158 500 158 570 128" stroke="url(#chrome)" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <ellipse cx="270" cy="168" rx="168" ry="108" fill="url(#lens)" stroke="url(#chrome)" stroke-width="16"/>
+        <ellipse cx="730" cy="168" rx="168" ry="108" fill="url(#lens)" stroke="url(#chrome)" stroke-width="16"/>
+        <ellipse cx="270" cy="168" rx="132" ry="78" fill="url(#glint)" opacity="0.45"/>
+        <ellipse cx="730" cy="168" rx="132" ry="78" fill="url(#glint)" opacity="0.45"/>
+      </svg>
+      <h1>
+        <span>Night</span>
+        <span>Walker</span>
+      </h1>
+    </div>
+    <p class="tag">Color Filters on at sunset. Off at sunrise.</p>
+    <a class="cta" href="NightWalker.dmg" download="NightWalker.dmg">Download</a>
+    <p class="gate">macOS 13+, Intel or Apple Silicon. Right-click → Open the first time.</p>
+  </main>
+</body>
+</html>
