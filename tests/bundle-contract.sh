@@ -21,22 +21,12 @@ fi
 
 ./bundle.sh
 
-shopt -s nullglob
-apps=(dist/*.app)
-shopt -u nullglob
-if [ ${#apps[@]} -eq 0 ]; then
-    echo "FAIL: bundle.sh produced no dist/*.app"
-    exit 1
-fi
-# Prefer the most recently modified bundle if several names coexist.
-APP="$(ls -td dist/*.app | head -1)"
-echo "bundle-contract: inspecting $APP"
-
+APP="dist/Night Walker.app"
 if [ ! -d "$APP" ]; then
-    fail "bundle path is not a directory: $APP"
-    echo "bundle-contract: $failures failure(s)"
+    echo "FAIL: bundle.sh did not produce $APP"
     exit 1
 fi
+echo "bundle-contract: inspecting $APP"
 
 if codesign --verify --verbose=1 "$APP"; then
     ok "codesign --verify"

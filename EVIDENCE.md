@@ -103,9 +103,15 @@ Before/after each: `defaults read com.flo.color-filter-scheduler` →
 
 ## 7. Build, bundle, and menu-bar app launch
 
+This section records the original host-architecture bundle smoke test. The
+current friend-distribution contract is the universal, ad-hoc-signed
+`dist/Night Walker.app` and `dist/NightWalker-<version>.dmg`; see
+[`docs/evidence/cfs-prodready/PACKAGING.md`](docs/evidence/cfs-prodready/PACKAGING.md)
+for its packaging evidence.
+
 ```
 swift build -c release  -> Build complete!  (CLT, no Xcode)
-./bundle.sh             -> dist/Color Filter Scheduler.app
+./bundle.sh             -> dist/Color Filter Scheduler.app  (historical output)
   Info.plist: OK (plutil -lint); LSUIElement=true; id com.flo.color-filter-scheduler
   codesign:   Signature=adhoc, satisfies its Designated Requirement
 ```
