@@ -105,7 +105,7 @@ Before/after each: `defaults read com.flo.color-filter-scheduler` →
 
 ```
 swift build -c release  -> Build complete!  (CLT, no Xcode)
-./bundle.sh             -> dist/Color Filter Scheduler.app
+./bundle.sh             -> dist/Night Walker.app
   Info.plist: OK (plutil -lint); LSUIElement=true; id com.flo.color-filter-scheduler
   codesign:   Signature=adhoc, satisfies its Designated Requirement
 ```

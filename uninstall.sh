@@ -6,7 +6,7 @@
 set -euo pipefail
 
 LABEL="com.flo.color-filter-scheduler"
-APP_NAME="Color Filter Scheduler"
+APP_NAME="Night Walker"
 EXECUTABLE="color-filter-scheduler"
 INSTALLED_APP="$HOME/Applications/$APP_NAME.app"
 APP_BINARY="$INSTALLED_APP/Contents/MacOS/$EXECUTABLE"

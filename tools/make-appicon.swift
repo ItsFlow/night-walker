@@ -3,8 +3,9 @@
 // Renders the app's .iconset PNGs programmatically (no third-party assets, no
 // Xcode). bundle.sh runs this, then `iconutil` assembles the .icns.
 //
-// The icon mirrors the app's motif: a day/night split disc (a color filter)
-// on a soft rounded gradient tile.
+// Same Night Walker eclipse as Sources/.../EclipseMark.swift (keep the unit-
+// space numbers in sync): black disc + thin right crescent on a light tile.
+// No flames. The menu-bar template is the same silhouette, monochrome.
 //
 // Usage: swift tools/make-appicon.swift <output-iconset-dir>
 
@@ -18,46 +19,64 @@ guard args.count >= 2 else {
 let outDir = args[1]
 try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 
+// Unit square, origin bottom-left, y-up. Must match EclipseMark.swift.
+let markCY: CGFloat = 0.50
+let markR: CGFloat = 0.40
+// Tuned proportions for the disc, gap, and sliver.
+let markGapFrac: CGFloat = 0.101
+let markOffsetFrac: CGFloat = 0.106
+let markMinGap: CGFloat = 1.15
+let markMinOffset: CGFloat = 1.45
+
+struct EclipseGeometry {
+    var disc: CGRect
+    var punch: CGRect
+    var outer: CGRect
+}
+
+func eclipseGeometry(in rect: CGRect) -> EclipseGeometry {
+    let pad = min(rect.width, rect.height) * 0.04
+    let box = rect.insetBy(dx: pad, dy: pad)
+    let s = min(box.width, box.height)
+    let ox = box.midX - s / 2
+    let oy = box.midY - s / 2
+    let gap = max(markMinGap / s, markGapFrac * markR)
+    let offset = max(markMinOffset / s, markOffsetFrac * markR)
+    let cx = 0.50 - (gap + offset) / 2
+    func oval(cx: CGFloat, cy: CGFloat, r: CGFloat) -> CGRect {
+        CGRect(x: ox + (cx - r) * s,
+               y: oy + (cy - r) * s,
+               width: 2 * r * s,
+               height: 2 * r * s)
+    }
+    let punchR = markR + gap
+    return EclipseGeometry(
+        disc: oval(cx: cx, cy: markCY, r: markR),
+        punch: oval(cx: cx, cy: markCY, r: punchR),
+        outer: oval(cx: cx + offset, cy: markCY, r: punchR)
+    )
+}
+
 func draw(_ px: CGFloat) -> NSImage {
     let size = NSSize(width: px, height: px)
     let img = NSImage(size: size, flipped: false) { rect in
-        // Rounded tile with a vertical warm→cool gradient.
         let corner = px * 0.22
         let tile = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
-        let bg = NSGradient(colors: [
-            NSColor(calibratedRed: 0.13, green: 0.12, blue: 0.20, alpha: 1),
-            NSColor(calibratedRed: 0.20, green: 0.16, blue: 0.28, alpha: 1),
-        ])
-        bg?.draw(in: tile, angle: -90)
+        // Light tile so the black disc reads — same as the canonical jpg.
+        let tileColor = NSColor(calibratedWhite: 0.97, alpha: 1)
+        tileColor.setFill()
+        tile.fill()
+        tile.addClip()
 
-        // Central day/night disc.
-        let d = px * 0.56
-        let discRect = NSRect(x: (px - d) / 2, y: (px - d) / 2, width: d, height: d)
+        let g = eclipseGeometry(in: rect)
 
-        // Left half: light (day).
-        NSGraphicsContext.saveGraphicsState()
-        NSRect(x: rect.minX, y: rect.minY, width: discRect.midX, height: px).clip()
-        NSColor(calibratedRed: 0.98, green: 0.86, blue: 0.62, alpha: 1).setFill()
-        NSBezierPath(ovalIn: discRect).fill()
-        NSGraphicsContext.restoreGraphicsState()
-
-        // Right half: tinted gradient (night).
-        NSGraphicsContext.saveGraphicsState()
-        NSRect(x: discRect.midX, y: rect.minY, width: px - discRect.midX, height: px).clip()
-        let disc = NSBezierPath(ovalIn: discRect)
-        let tint = NSGradient(colors: [
-            NSColor(calibratedRed: 0.98, green: 0.55, blue: 0.30, alpha: 1),
-            NSColor(calibratedRed: 0.40, green: 0.30, blue: 0.75, alpha: 1),
-        ])
-        disc.addClip()
-        tint?.draw(in: discRect, angle: -90)
-        NSGraphicsContext.restoreGraphicsState()
-
-        // Thin ring for definition.
-        let ring = NSBezierPath(ovalIn: discRect)
-        ring.lineWidth = max(1, px * 0.012)
-        NSColor(calibratedWhite: 1, alpha: 0.35).setStroke()
-        ring.stroke()
+        // Black crescent, then punch the gap with the tile, then black disc.
+        NSColor.black.setFill()
+        NSBezierPath(ovalIn: g.outer).fill()
+        tileColor.setFill()
+        NSBezierPath(ovalIn: g.punch).fill()
+        NSColor.black.setFill()
+        NSBezierPath(ovalIn: g.disc).fill()
 
         return true
     }
