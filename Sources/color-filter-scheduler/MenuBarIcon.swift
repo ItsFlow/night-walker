@@ -3,11 +3,11 @@ import AppKit
 /// The menu-bar status icon, drawn programmatically as a monochrome *template*
 /// image so macOS tints it correctly in both light and dark menu bars.
 ///
-/// The glyph is the Night Walker eclipse: a filled disc with two bold right-side
-/// prominence blades. No third-party assets, no bundled bitmap.
+/// The glyph is the Night Walker eclipse: a filled disc with a thin crescent
+/// on the right. No third-party assets, no bundled bitmap.
 enum MenuBarIcon {
     static func image() -> NSImage {
-        let size = NSSize(width: 20, height: 18)
+        let size = NSSize(width: 18, height: 18)
         let img = NSImage(size: size, flipped: false) { rect in
             EclipseMark.fill(in: rect, color: .black)
             return true
@@ -32,7 +32,7 @@ enum MenuBarIcon {
     /// (black), proving the template reads correctly in both menu-bar looks.
     static func writeEvidence(to path: String) {
         let scale: CGFloat = 6
-        let iconSize = image().size            // 20 × 18
+        let iconSize = image().size            // 18 × 18
         let padX: CGFloat = 12, padY: CGFloat = 9, gap: CGFloat = 20
         let barW = iconSize.width + padX * 2, barH = iconSize.height + padY * 2
         let canvas = NSSize(width: (barW * 2 + gap) * scale, height: barH * scale)

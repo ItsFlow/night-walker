@@ -4,8 +4,9 @@
 // Xcode). bundle.sh runs this, then `iconutil` assembles the .icns.
 //
 // Same Night Walker eclipse as Sources/.../EclipseMark.swift (keep the unit-
-// space numbers in sync): filled disc + two right-side prominence blades.
-// Dock/app icon tints the blades red on a dark tile; the silhouette is unchanged.
+// space numbers in sync): filled disc + thin right crescent. No flames.
+// Dock/app icon is that silhouette on a dark tile; the crescent is light so
+// it reads (the menu-bar template is monochrome black).
 //
 // Usage: swift tools/make-appicon.swift <output-iconset-dir>
 
@@ -20,55 +21,36 @@ let outDir = args[1]
 try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 
 // Unit square, origin bottom-left, y-up. Must match EclipseMark.swift.
-let markCX: CGFloat = 0.34
+let markCX: CGFloat = 0.48
 let markCY: CGFloat = 0.50
-let markR: CGFloat = 0.28
+let markR: CGFloat = 0.36
+let markGap: CGFloat = 0.055
+let markOffset: CGFloat = 0.065
 
 struct EclipseGeometry {
     var disc: CGRect
-    var upper: [CGPoint]
-    var lower: [CGPoint]
-}
-
-func triangle(tipDeg: CGFloat, length: CGFloat,
-              fromDeg: CGFloat, toDeg: CGFloat) -> [CGPoint] {
-    func rim(_ deg: CGFloat, _ rad: CGFloat) -> CGPoint {
-        let a = deg * .pi / 180
-        return CGPoint(x: markCX + cos(a) * rad, y: markCY + sin(a) * rad)
-    }
-    let base = markR * 0.72
-    return [rim(fromDeg, base), rim(tipDeg, markR + length), rim(toDeg, base)]
+    var punch: CGRect
+    var outer: CGRect
 }
 
 func eclipseGeometry(in rect: CGRect) -> EclipseGeometry {
-    let pad = min(rect.width, rect.height) * 0.05
+    let pad = min(rect.width, rect.height) * 0.06
     let box = rect.insetBy(dx: pad, dy: pad)
     let s = min(box.width, box.height)
-    let ox = box.width > box.height ? box.minX : box.midX - s / 2
+    let ox = box.midX - s / 2
     let oy = box.midY - s / 2
-    func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-        CGPoint(x: ox + x * s, y: oy + y * s)
+    func oval(cx: CGFloat, cy: CGFloat, r: CGFloat) -> CGRect {
+        CGRect(x: ox + (cx - r) * s,
+               y: oy + (cy - r) * s,
+               width: 2 * r * s,
+               height: 2 * r * s)
     }
-    let disc = CGRect(x: ox + (markCX - markR) * s,
-                      y: oy + (markCY - markR) * s,
-                      width: 2 * markR * s,
-                      height: 2 * markR * s)
+    let punchR = markR + markGap
     return EclipseGeometry(
-        disc: disc,
-        upper: triangle(tipDeg: 56, length: 0.36, fromDeg: 70, toDeg: 44)
-            .map { pt($0.x, $0.y) },
-        lower: triangle(tipDeg: 4, length: 0.38, fromDeg: 16, toDeg: -10)
-            .map { pt($0.x, $0.y) }
+        disc: oval(cx: markCX, cy: markCY, r: markR),
+        punch: oval(cx: markCX, cy: markCY, r: punchR),
+        outer: oval(cx: markCX + markOffset, cy: markCY, r: punchR)
     )
-}
-
-func fillPoly(_ pts: [CGPoint]) {
-    guard let first = pts.first, pts.count >= 3 else { return }
-    let p = NSBezierPath()
-    p.move(to: first)
-    for pt in pts.dropFirst() { p.line(to: pt) }
-    p.close()
-    p.fill()
 }
 
 func draw(_ px: CGFloat) -> NSImage {
@@ -76,18 +58,20 @@ func draw(_ px: CGFloat) -> NSImage {
     let img = NSImage(size: size, flipped: false) { rect in
         let corner = px * 0.22
         let tile = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
-        NSColor(calibratedRed: 0.11, green: 0.11, blue: 0.12, alpha: 1).setFill()
+        let tileColor = NSColor(calibratedWhite: 0.16, alpha: 1)
+        tileColor.setFill()
         tile.fill()
         tile.addClip()
 
         let g = eclipseGeometry(in: rect)
 
-        // Flares: a touch of red. Same blades as the monochrome template.
-        NSColor(calibratedRed: 0.92, green: 0.22, blue: 0.07, alpha: 1).setFill()
-        fillPoly(g.upper)
-        fillPoly(g.lower)
+        // Crescent: fill the offset circle, then cover the overlap with the
+        // tile so only the right sliver remains. No flames.
+        NSColor(calibratedWhite: 0.96, alpha: 1).setFill()
+        NSBezierPath(ovalIn: g.outer).fill()
+        tileColor.setFill()
+        NSBezierPath(ovalIn: g.punch).fill()
 
-        // Disc on top — black void, clean circular rim.
         NSColor.black.setFill()
         NSBezierPath(ovalIn: g.disc).fill()
 
