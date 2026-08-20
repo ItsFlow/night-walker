@@ -78,13 +78,13 @@ tests use the `-key value` NSArgumentDomain (not persisted) — note it can't ta
 test locations there.
 
 ## Public download page
-GitHub Pages serves `docs/` (`index.html` + `NightWalker.dmg`).
-URL: `https://itsflow.github.io/night-walker/`.
+Static site lives in `docs/` (`index.html` + `NightWalker.dmg`).
 The Download button is a relative `NightWalker.dmg` href — replace that file
 in place to ship a new build without touching the page.
 `tests/site-contract.sh` is the HTTP contract. `.github/workflows/site.yml`
-runs it and deploys `docs/` through GitHub Actions after pushes to `main`.
-Do not rewrite the Swift app to change the page.
+runs it. Do **not** enable GitHub Pages; public hosting is a custom domain
+later (not `itsflow.github.io`). Do not rewrite the Swift app to change the
+page.
 
 ## Maintaining this file
 
