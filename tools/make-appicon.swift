@@ -17,7 +17,12 @@ guard args.count >= 2 else {
     exit(2)
 }
 let outDir = args[1]
-try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
+do {
+    try FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
+} catch {
+    FileHandle.standardError.write(Data("error: could not create \(outDir): \(error)\n".utf8))
+    exit(1)
+}
 
 // Unit square, origin bottom-left, y-up. Must match EclipseMark.swift.
 let markCY: CGFloat = 0.50
@@ -83,26 +88,38 @@ func draw(_ px: CGFloat) -> NSImage {
     return img
 }
 
-func writePNG(_ image: NSImage, px: Int, to path: String) {
-    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
-                               bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
-                               isPlanar: false, colorSpaceName: .deviceRGB,
-                               bytesPerRow: 0, bitsPerPixel: 0)!
+func writePNG(_ image: NSImage, px: Int, to path: String) throws {
+    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
+                                     bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                     isPlanar: false, colorSpaceName: .deviceRGB,
+                                     bytesPerRow: 0, bitsPerPixel: 0) else {
+        throw CocoaError(.fileWriteUnknown)
+    }
     rep.size = NSSize(width: px, height: px)
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     image.draw(in: NSRect(x: 0, y: 0, width: px, height: px))
     NSGraphicsContext.restoreGraphicsState()
-    if let data = rep.representation(using: .png, properties: [:]) {
-        try? data.write(to: URL(fileURLWithPath: path))
+    guard let data = rep.representation(using: .png, properties: [:]) else {
+        throw CocoaError(.fileWriteUnknown)
+    }
+    try data.write(to: URL(fileURLWithPath: path))
+    let attrs = try FileManager.default.attributesOfItem(atPath: path)
+    if (attrs[.size] as? NSNumber)?.intValue ?? 0 <= 0 {
+        throw CocoaError(.fileWriteUnknown)
     }
 }
 
 // (point size, scale) pairs iconutil expects.
 let specs: [(Int, Int)] = [(16,1),(16,2),(32,1),(32,2),(128,1),(128,2),(256,1),(256,2),(512,1),(512,2)]
-for (pt, scale) in specs {
-    let px = pt * scale
-    let name = scale == 1 ? "icon_\(pt)x\(pt).png" : "icon_\(pt)x\(pt)@2x.png"
-    writePNG(draw(CGFloat(px)), px: px, to: "\(outDir)/\(name)")
+do {
+    for (pt, scale) in specs {
+        let px = pt * scale
+        let name = scale == 1 ? "icon_\(pt)x\(pt).png" : "icon_\(pt)x\(pt)@2x.png"
+        try writePNG(draw(CGFloat(px)), px: px, to: "\(outDir)/\(name)")
+    }
+    print("wrote iconset -> \(outDir)")
+} catch {
+    FileHandle.standardError.write(Data("error: writing iconset failed: \(error)\n".utf8))
+    exit(1)
 }
-print("wrote iconset -> \(outDir)")

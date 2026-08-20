@@ -94,7 +94,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func reconcileAndRefresh() {
         ReconcileEngine.reconcile()
         model?.refresh()
-        updateStatusAppearance()
     }
 
     // MARK: - Status item
@@ -108,12 +107,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.action = #selector(togglePanel(_:))
             button.target = self
         }
-    }
-
-    /// Subtly reflect "filter on" in the menu bar: template images auto-tint, so
-    /// we lean on the button's cell state rather than color.
-    private func updateStatusAppearance() {
-        statusItem?.button?.appearsDisabled = false
     }
 
     // MARK: - Key panel
@@ -147,7 +140,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func openPanel() {
         model.refresh()
-        updateStatusAppearance()
 
         let fittingSize = hostingController.sizeThatFits(
             in: NSSize(width: 288, height: CGFloat.greatestFiniteMagnitude))

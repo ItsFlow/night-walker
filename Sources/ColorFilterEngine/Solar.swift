@@ -1,15 +1,21 @@
 import Foundation
 
 /// Computed sunrise/sunset for a location and instant.
-struct SunTimes {
-    enum Kind {
+public struct SunTimes: Equatable, Sendable {
+    public enum Kind: Equatable, Sendable {
         case normal      // sun rises and sets
         case polarDay    // sun never sets (24h daylight)
         case polarNight  // sun never rises (24h darkness)
     }
-    var kind: Kind
-    var sunrise: Date?   // nil for polar cases
-    var sunset: Date?    // nil for polar cases
+    public var kind: Kind
+    public var sunrise: Date?   // nil for polar cases
+    public var sunset: Date?    // nil for polar cases
+
+    public init(kind: Kind, sunrise: Date?, sunset: Date?) {
+        self.kind = kind
+        self.sunrise = sunrise
+        self.sunset = sunset
+    }
 }
 
 /// Pure-Swift solar position math — no network, no dependencies.
@@ -17,13 +23,13 @@ struct SunTimes {
 /// Implements the standard NOAA "sunrise equation". All results are absolute
 /// `Date` instants (Julian-date based), so no local-timezone bookkeeping is
 /// needed: compare the returned instants directly against `Date()`.
-enum Solar {
+public enum Solar {
     private static let rad = Double.pi / 180.0
     private static let deg = 180.0 / Double.pi
 
     /// Compute sunrise & sunset for the calendar day nearest `date` at the
     /// given latitude/longitude (degrees, north/east positive).
-    static func compute(latitude: Double, longitude: Double, date: Date = Date()) -> SunTimes {
+    public static func compute(latitude: Double, longitude: Double, date: Date = Date()) -> SunTimes {
         // Julian date of the given instant.
         let jd = date.timeIntervalSince1970 / 86400.0 + 2440587.5
 

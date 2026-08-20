@@ -1,4 +1,5 @@
 import SwiftUI
+import ColorFilterEngine
 
 /// Shared palette for the panel. Tuned near-black to match the captain's
 /// preferred "Left" menu-bar app (a deep, neutral, near-black surface rather
@@ -9,8 +10,6 @@ import SwiftUI
 enum Palette {
     /// Near-black panel body (~#111214).
     static let panel = Color(red: 0.067, green: 0.070, blue: 0.078)
-    /// Hairline separators / subtle borders on the dark surface.
-    static let hairline = Color.white.opacity(0.08)
 
     /// Run/Pause — ON (filter running): a filled emerald block.
     static let runOn = Color(red: 0.17, green: 0.70, blue: 0.44)
@@ -308,56 +307,68 @@ private struct AutomaticControl: View {
 // MARK: - Evidence rendering (offscreen; never touches the live filter)
 
 /// Renders the front and settings pages to PNGs for documentation. It builds a
-/// throwaway model and assigns display values in-memory only — it never calls
-/// the engine setters, so the captain's live Color Filters state is untouched.
+/// throwaway model and assigns display values in-memory only — it never writes
+/// `Settings` and never calls the engine setters, so saved location and the
+/// captain's live Color Filters state stay untouched.
 enum PanelEvidence {
-    @MainActor
-    static func render(to dir: String) {
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+    enum RenderError: Error, LocalizedError {
+        case bitmapFailed(String)
+        case pngFailed(String)
+        case emptyOutput(String)
 
-        // Temporarily seed a location in THIS binary's defaults (isolated from the
-        // installed app's domain) so the shots aren't empty; restored afterwards.
-        let savedLat = Settings.shared.latitude, savedLon = Settings.shared.longitude
-        let savedName = Settings.shared.locationName
-        Settings.shared.latitude = 38.72; Settings.shared.longitude = -9.14
-        Settings.shared.locationName = "Lisbon, Portugal"
-        defer {
-            Settings.shared.latitude = savedLat; Settings.shared.longitude = savedLon
-            Settings.shared.locationName = savedName
+        var errorDescription: String? {
+            switch self {
+            case .bitmapFailed(let path): return "could not capture bitmap for \(path)"
+            case .pngFailed(let path): return "could not encode PNG for \(path)"
+            case .emptyOutput(let path): return "wrote empty file at \(path)"
+            }
         }
+    }
 
-        let onModel = AppModel()
-        onModel.filterOn = true
-        onModel.strength = 0.62
-        onModel.automationEnabled = false
-        onModel.latitudeText = "38.72"; onModel.longitudeText = "-9.14"
-        onModel.cityText = "Lisbon, Portugal"
-        onModel.geocodeMessage = "Lisbon, Portugal · 38.7223, -9.1393"
-        onModel.lastGeocodeOK = true
-        onModel.statusText = "On"
+    @MainActor
+    static func render(to dir: String) throws {
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
-        let offModel = AppModel()
-        offModel.filterOn = false
-        offModel.automationEnabled = true
-        offModel.latitudeText = "38.72"; offModel.longitudeText = "-9.14"
-        offModel.cityText = "Lisbon, Portugal"
-        offModel.geocodeMessage = "Lisbon, Portugal · 38.7223, -9.1393"
-        offModel.lastGeocodeOK = true
-        offModel.statusText = "Off · auto"
+        let onModel = makeEvidenceModel(filterOn: true, automation: false, strength: 0.62)
+        let offModel = makeEvidenceModel(filterOn: false, automation: true, strength: 0.62)
 
-        save(FrontPage(model: onModel, openSettings: {}), "\(dir)/panel-front-running.png")
-        save(FrontPage(model: offModel, openSettings: {}), "\(dir)/panel-front-paused.png")
-        save(SettingsPage(model: onModel, back: {}, quit: {}, locationExpanded: true),
-             "\(dir)/panel-settings.png")
-        MenuBarIcon.writeEvidence(to: "\(dir)/menubar-icon-light-dark.png")
+        try save(FrontPage(model: onModel, openSettings: {}), "\(dir)/panel-front-running.png")
+        try save(FrontPage(model: offModel, openSettings: {}), "\(dir)/panel-front-paused.png")
+        try save(SettingsPage(model: onModel, back: {}, quit: {}, locationExpanded: true),
+                 "\(dir)/panel-settings.png")
+        try MenuBarIcon.writeEvidence(to: "\(dir)/menubar-icon-light-dark.png")
         print("wrote panel evidence -> \(dir)")
+    }
+
+    /// Seed published display values only. Disposable Settings + inert live
+    /// filters so evidence never reads/writes the real app domain or SPI.
+    @MainActor
+    private static func makeEvidenceModel(filterOn: Bool, automation: Bool, strength: Double) -> AppModel {
+        let suite = "cfs-panel-evidence-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite) ?? UserDefaults()
+        defaults.removePersistentDomain(forName: suite)
+        let model = AppModel(settings: ColorFilterEngine.Settings(defaults: defaults),
+                             live: LiveColorFilters.inert,
+                             reconcile: {})
+        model.filterOn = filterOn
+        model.strength = strength
+        model.automationEnabled = automation
+        model.latitudeText = "38.72"
+        model.longitudeText = "-9.14"
+        model.cityText = "Lisbon, Portugal"
+        model.geocodeMessage = "Lisbon, Portugal · 38.7223, -9.1393"
+        model.lastGeocodeOK = true
+        model.hasLocation = true
+        model.locationDisplay = "Lisbon, Portugal"
+        model.locationSummary = "38.72, -9.14"
+        return model
     }
 
     /// Render via the real AppKit path (NSHostingView in an offscreen dark
     /// window + cacheDisplay) so NSSlider/NSTextField/switch draw as they do
     /// live — unlike ImageRenderer, which stubs AppKit-backed controls.
     @MainActor
-    private static func save<V: View>(_ view: V, _ path: String) {
+    private static func save<V: View>(_ view: V, _ path: String) throws {
         let wrapped = view
             .frame(width: 288)
             .background(Color(nsColor: NSColor(calibratedRed: 0.067, green: 0.070, blue: 0.078, alpha: 1)))
@@ -373,10 +384,18 @@ enum PanelEvidence {
         window.contentView = host
         window.displayIfNeeded()
 
-        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+            throw RenderError.bitmapFailed(path)
+        }
         host.cacheDisplay(in: host.bounds, to: rep)
-        if let png = rep.representation(using: .png, properties: [:]) {
-            try? png.write(to: URL(fileURLWithPath: path))
+        guard let png = rep.representation(using: .png, properties: [:]) else {
+            throw RenderError.pngFailed(path)
+        }
+        try png.write(to: URL(fileURLWithPath: path))
+        let attrs = try FileManager.default.attributesOfItem(atPath: path)
+        let size = attrs[.size] as? NSNumber
+        if size?.intValue ?? 0 <= 0 {
+            throw RenderError.emptyOutput(path)
         }
     }
 }

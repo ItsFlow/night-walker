@@ -25,7 +25,7 @@ enum MenuBarIcon {
 
     /// Render an evidence PNG: the icon on a dark bar (white) and a light bar
     /// (black), proving the template reads correctly in both menu-bar looks.
-    static func writeEvidence(to path: String) {
+    static func writeEvidence(to path: String) throws {
         let scale: CGFloat = 6
         let iconSize = image().size            // 18 × 18
         let padX: CGFloat = 12, padY: CGFloat = 9, gap: CGFloat = 20
@@ -46,9 +46,14 @@ enum MenuBarIcon {
         swatch(x: barW + gap, bg: NSColor(calibratedWhite: 0.93, alpha: 1), tint: NSColor(calibratedWhite: 0.10, alpha: 1))
 
         out.unlockFocus()
-        if let tiff = out.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-           let png = rep.representation(using: .png, properties: [:]) {
-            try? png.write(to: URL(fileURLWithPath: path))
+        guard let tiff = out.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        try png.write(to: URL(fileURLWithPath: path))
+        let attrs = try FileManager.default.attributesOfItem(atPath: path)
+        if (attrs[.size] as? NSNumber)?.intValue ?? 0 <= 0 {
+            throw CocoaError(.fileWriteUnknown)
         }
     }
 }

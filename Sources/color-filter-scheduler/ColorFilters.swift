@@ -13,10 +13,6 @@ enum ColorFilters {
     /// `com.apple.mediaaccessibility "__Color__-MADisplayFilterCategoryEnabled"`.
     static let colorCategory: Int = 1
 
-    /// The "Color Tint" / single-color filter type id (confirmed empirically as
-    /// the value returned by MADisplayFilterPrefGetType() on this machine).
-    static let singleColorType: Int = 16
-
     /// Current master state of Color Filters.
     static var isEnabled: Bool {
         MADisplayFilterPrefGetCategoryEnabled(colorCategory) != 0
@@ -39,6 +35,17 @@ enum ColorFilters {
     /// across launches without any extra bookkeeping.
     static var strength: Double {
         get { MADisplayFilterPrefGetSingleColorIntensity() }
-        set { MADisplayFilterPrefSetSingleColorIntensity(min(1, max(0, newValue))) }
+        set {
+            // Non-finite values are ignored so a slider glitch or CLI junk
+            // cannot coerce nan→0 / inf→1 through min/max.
+            guard let accepted = Self.acceptedStrength(newValue) else { return }
+            MADisplayFilterPrefSetSingleColorIntensity(accepted)
+        }
+    }
+
+    /// Finite values are clamped to 0...1. Non-finite input is rejected.
+    static func acceptedStrength(_ value: Double) -> Double? {
+        guard value.isFinite else { return nil }
+        return min(1, max(0, value))
     }
 }

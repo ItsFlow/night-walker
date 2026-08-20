@@ -14,7 +14,7 @@ stay `color-filter-scheduler`. CLT-only (no Xcode), zero third-party deps. See
 The presentation is a custom near-black, borderless `NSPanel` hosting SwiftUI,
 **not** an `NSMenu` or `NSPopover`. Deployment target is **macOS 13**
 (Package.swift + bundle.sh
-`LSMinimumSystemVersion`) for SwiftUI + `ImageRenderer`. Files:
+`LSMinimumSystemVersion`) for SwiftUI. Files:
 - `AppModel.swift` — `ObservableObject` bridge; the UI never calls the engine
   directly. Documents the manual-Run/Pause vs. Automatic override rule. Also
   owns city→coords geocoding via `CLGeocoder.geocodeAddressString` (CoreLocation,
@@ -28,7 +28,8 @@ The presentation is a custom near-black, borderless `NSPanel` hosting SwiftUI,
   (a cool hue) not warm orange, so it stays legible while the screen's own
   warm/red Color Filter is applied (a warm fill blends into the tint). Also
   `PanelEvidence` (renders panel PNGs via NSHostingView + `cacheDisplay` —
-  `ImageRenderer` stubs AppKit controls).
+  `ImageRenderer` stubs AppKit controls). `--render-panel` must not write
+  `Settings`.
 - Dismissal is a key-window lifecycle, not mouse hit-testing: `StatusPanel`
   stays key for controls and text, `windowDidResignKey` handles a genuine
   click-away, and a local key monitor handles Esc. **Never reintroduce a global
@@ -53,10 +54,17 @@ below); `--render-panel` is read-only w.r.t. the live filter.
   (the standard CLT no-Xcode pattern: release build → hand-assembled `.app` →
   `codesign -s -`). `install.sh` installs to `~/Applications` + a launch-at-login
   LaunchAgent (`com.flo.color-filter-scheduler.plist.template`).
+- `swift test` is the real engine/settings/CLI suite (Solar, Scheduler,
+  Settings fail-closed, atomic lat/lon, geocode request tokens). CLT has
+  **Swift Testing**, not XCTest — do not reintroduce `import XCTest`. Keep
+  `tests/panel-contract.sh` and `tests/ui-contract.sh` as architecture
+  tripwires. `--selftest` remains the key-panel structural check.
 - The binary doubles as a headless test CLI (`--get`, `--set-enabled`,
   `--set-intensity`, `--decide/--reconcile --lat --lon [--apply]`,
   `--engine-status`, `--engine-reconcile`, `--selftest` = key-panel architecture
-  regression, exit 0 = pass). No args → menu-bar GUI.
+  regression, exit 0 = pass). Invalid lat/lon/intensity/offsets exit 2 before
+  any live Color Filters read or write. `--engine-status`/`--engine-reconcile`
+  read saved settings; `--render-panel` must not. No args → menu-bar GUI.
 
 ## MediaAccessibility SPI (the load-bearing, non-obvious part)
 Declared in `Sources/CMediaAccessibility/include/CMediaAccessibility.h`. Private
@@ -82,7 +90,9 @@ This runs on the captain's real Mac. Never leave Color Filters changed: capture
 `defaults read com.apple.mediaaccessibility` first and restore exactly. Engine
 tests use the `-key value` NSArgumentDomain (not persisted) — note it can't take
 **negative** lat/lon (a leading `-` is parsed as a flag); use positive-hemisphere
-test locations there.
+test locations there. CLI `--lat/--lon` *does* accept negatives. Inject
+`Settings(defaults:)` with a disposable suite for unit tests; never write
+`com.flo.color-filter-scheduler`.
 
 ## Maintaining this file
 
