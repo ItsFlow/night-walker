@@ -30,7 +30,15 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILT" "$APP/Contents/MacOS/$EXECUTABLE"
 
 echo "==> Rendering app icon (.icns)"
-ICONSET="$(mktemp -d)/AppIcon.iconset"
+ICON_TMP="$(mktemp -d)"
+cleanup_icon_tmp() {
+    # Delete only the exact directory mktemp created for this run.
+    if [[ -n "${ICON_TMP:-}" && -d "$ICON_TMP" ]]; then
+        rm -rf -- "$ICON_TMP"
+    fi
+}
+trap cleanup_icon_tmp EXIT
+ICONSET="$ICON_TMP/AppIcon.iconset"
 swift "$REPO_DIR/tools/make-appicon.swift" "$ICONSET"
 if iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"; then
     ICON_KEY='    <key>CFBundleIconFile</key>        <string>AppIcon</string>'

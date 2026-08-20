@@ -11,14 +11,23 @@ let package = Package(
         // The symbols themselves live in the system framework (linked below).
         .target(name: "CMediaAccessibility"),
 
+        // Pure solar math + persisted settings. Extracted so `swift test` can
+        // characterize the engine without importing AppKit or the SPI wrapper.
+        .target(name: "ColorFilterEngine"),
+
         .executableTarget(
             name: "color-filter-scheduler",
-            dependencies: ["CMediaAccessibility"],
+            dependencies: ["CMediaAccessibility", "ColorFilterEngine"],
             linkerSettings: [
                 .linkedFramework("MediaAccessibility"),
                 .linkedFramework("CoreFoundation"),
                 .linkedFramework("CoreLocation"),
             ]
+        ),
+
+        .testTarget(
+            name: "color-filter-schedulerTests",
+            dependencies: ["ColorFilterEngine", "color-filter-scheduler"]
         ),
     ]
 )

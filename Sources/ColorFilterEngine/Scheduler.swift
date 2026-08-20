@@ -1,23 +1,32 @@
 import Foundation
 
 /// Turns (location, offsets, now) into a desired Color Filters on/off state.
-enum Scheduler {
+public enum Scheduler {
     /// The offset-adjusted sunrise/sunset used for the decision.
-    struct Decision {
-        var sun: SunTimes
-        var adjustedSunrise: Date?
-        var adjustedSunset: Date?
-        var wantOn: Bool
-        var reason: String
+    public struct Decision: Equatable, Sendable {
+        public var sun: SunTimes
+        public var adjustedSunrise: Date?
+        public var adjustedSunset: Date?
+        public var wantOn: Bool
+        public var reason: String
+
+        public init(sun: SunTimes, adjustedSunrise: Date?, adjustedSunset: Date?,
+                    wantOn: Bool, reason: String) {
+            self.sun = sun
+            self.adjustedSunrise = adjustedSunrise
+            self.adjustedSunset = adjustedSunset
+            self.wantOn = wantOn
+            self.reason = reason
+        }
     }
 
     /// Positive `sunriseOffsetMinutes` shifts the morning OFF transition later;
     /// positive `sunsetOffsetMinutes` shifts the evening ON transition later.
-    static func decide(latitude: Double,
-                       longitude: Double,
-                       sunriseOffsetMinutes: Double = 0,
-                       sunsetOffsetMinutes: Double = 0,
-                       now: Date = Date()) -> Decision {
+    public static func decide(latitude: Double,
+                              longitude: Double,
+                              sunriseOffsetMinutes: Double = 0,
+                              sunsetOffsetMinutes: Double = 0,
+                              now: Date = Date()) -> Decision {
         let sun = Solar.compute(latitude: latitude, longitude: longitude, date: now)
         let sunriseOffset = sunriseOffsetMinutes * 60
         let sunsetOffset = sunsetOffsetMinutes * 60

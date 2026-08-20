@@ -1,4 +1,5 @@
 import Foundation
+import ColorFilterEngine
 
 /// The scheduling engine: reconciles the live Color Filters state to what the
 /// solar schedule says it should be. Pure of UI; the AppDelegate wires a timer
@@ -15,14 +16,13 @@ enum ReconcileEngine {
     /// Compute (but do not apply) what should happen right now.
     static func snapshot(now: Date = Date()) -> Snapshot {
         let s = Settings.shared
-        guard s.automationEnabled, s.hasValidLocation,
-              let lat = s.latitude, let lon = s.longitude else {
+        guard s.automationEnabled, let coords = s.coordinates else {
             return Snapshot(automationEnabled: s.automationEnabled,
                             hasLocation: s.hasValidLocation,
                             currentlyEnabled: ColorFilters.isEnabled,
                             decision: nil)
         }
-        let decision = Scheduler.decide(latitude: lat, longitude: lon,
+        let decision = Scheduler.decide(latitude: coords.latitude, longitude: coords.longitude,
                                         sunriseOffsetMinutes: s.sunriseOffsetMinutes,
                                         sunsetOffsetMinutes: s.sunsetOffsetMinutes,
                                         now: now)
@@ -37,9 +37,9 @@ enum ReconcileEngine {
     static func reconcile(now: Date = Date()) -> Bool {
         let s = Settings.shared
         guard s.automationEnabled else { return false }
-        guard s.hasValidLocation, let lat = s.latitude, let lon = s.longitude else { return false }
+        guard let coords = s.coordinates else { return false }
 
-        let decision = Scheduler.decide(latitude: lat, longitude: lon,
+        let decision = Scheduler.decide(latitude: coords.latitude, longitude: coords.longitude,
                                         sunriseOffsetMinutes: s.sunriseOffsetMinutes,
                                         sunsetOffsetMinutes: s.sunsetOffsetMinutes,
                                         now: now)

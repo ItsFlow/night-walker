@@ -1,9 +1,14 @@
 import Foundation
 import AppKit
+import ColorFilterEngine
 
-/// Headless command-line mode used for testing and evidence. It deliberately
-/// takes location explicitly on the command line and NEVER reads or writes the
-/// app's UserDefaults, so tests can't disturb the user's saved settings.
+/// Headless command-line mode used for testing and evidence.
+///
+/// Most commands take location on the command line. `--engine-status` and
+/// `--engine-reconcile` read the app's saved settings; `--engine-reconcile`,
+/// `--set-enabled`, `--set-intensity`, and `--reconcile --apply` can change
+/// the live Color Filters master/strength. `--render-panel` is display-only
+/// and must not write settings.
 ///
 /// Returns an exit code when it handles a command, or nil to fall through to the
 /// normal menu-bar GUI.
@@ -11,12 +16,13 @@ enum CLI {
     static func run(_ argv: [String]) -> Int32? {
         guard argv.count >= 2 else { return nil }
         let cmd = argv[1]
+        if cmd == "--help" || cmd == "-h" {
+            printHelp(); return 0
+        }
         guard cmd.hasPrefix("--") else { return nil }
         let opts = parseOptions(Array(argv.dropFirst(2)))
 
         switch cmd {
-        case "--help", "-h":
-            printHelp(); return 0
         case "--get":
             print("enabled=\(ColorFilters.isEnabled)")
             print("type=\(ColorFilters.filterType)")
@@ -30,21 +36,24 @@ enum CLI {
             print("enabled=\(ColorFilters.isEnabled)")
             return 0
         case "--set-intensity":
-            guard let v = opts["value"] ?? opts["_pos0"], let d = Double(v) else {
+            guard let v = opts["value"] ?? opts["_pos0"],
+                  let d = FiniteDouble.parse(v), (0...1).contains(d) else {
                 errln("--set-intensity needs a 0..1 value"); return 2
             }
             ColorFilters.strength = d
             print(String(format: "strength=%.6f", ColorFilters.strength))
             return 0
         case "--decide", "--reconcile":
-            guard let lat = opts["lat"].flatMap(Double.init),
-                  let lon = opts["lon"].flatMap(Double.init) else {
-                errln("\(cmd) needs --lat <deg> --lon <deg>"); return 2
+            guard let latText = opts["lat"], let lonText = opts["lon"],
+                  let coords = Coordinates.parse(latitudeText: latText, longitudeText: lonText) else {
+                errln("\(cmd) needs --lat <deg> --lon <deg> (latitude −90…90, longitude −180…180)"); return 2
             }
-            let srOff = opts["sr-off"].flatMap(Double.init) ?? 0
-            let ssOff = opts["ss-off"].flatMap(Double.init) ?? 0
+            guard let srOff = finiteOffset(opts["sr-off"]),
+                  let ssOff = finiteOffset(opts["ss-off"]) else {
+                errln("\(cmd) --sr-off/--ss-off must be finite numbers of minutes"); return 2
+            }
             let now = Date()
-            let d = Scheduler.decide(latitude: lat, longitude: lon,
+            let d = Scheduler.decide(latitude: coords.latitude, longitude: coords.longitude,
                                      sunriseOffsetMinutes: srOff, sunsetOffsetMinutes: ssOff,
                                      now: now)
             print("now: \(fmtDate(now))")
@@ -80,11 +89,17 @@ enum CLI {
             }
             return 0
         case "--render-panel":
-            // Render the redesigned panel to PNGs for evidence. Read-only w.r.t.
-            // the live filter (assigns display values in memory only).
+            // Render the redesigned panel to PNGs. Does not write Settings and
+            // does not touch the live filter.
             let dir = opts["dir"] ?? opts["_pos0"] ?? "docs/evidence/cfs-ui"
-            renderPanel(dir)
-            return 0
+            do {
+                try MainActor.assumeIsolated {
+                    try PanelEvidence.render(to: dir)
+                }
+                return 0
+            } catch {
+                errln("render-panel failed: \(error.localizedDescription)"); return 1
+            }
         case "--selftest":
             // Headless architecture regression for the panel-dismissal fix.
             // XCTest is unavailable under CLT-only, so assert here and return
@@ -99,6 +114,12 @@ enum CLI {
         default:
             errln("unknown command: \(cmd)"); printHelp(); return 2
         }
+    }
+
+    /// Missing offset → 0 (same as an unset flag). Present but non-finite → nil.
+    private static func finiteOffset(_ text: String?) -> Double? {
+        guard let text else { return 0 }
+        return FiniteDouble.parse(text)
     }
 
     // Parse `--key value` and bare `--flag` into a dict; bare flags map to "".
@@ -120,15 +141,6 @@ enum CLI {
             }
         }
         return out
-    }
-
-    private static func renderPanel(_ dir: String) {
-        // ImageRenderer needs an initialized AppKit app on the main thread.
-        _ = NSApplication.shared
-        NSApp.setActivationPolicy(.accessory)
-        MainActor.assumeIsolated {
-            PanelEvidence.render(to: dir)
-        }
     }
 
     /// Guards the key-panel architecture: no popover/global mouse state remains,
@@ -192,21 +204,28 @@ enum CLI {
     private static func printHelp() {
         print("""
         color-filter-scheduler — menu-bar app. With no arguments it launches the
-        menu-bar UI. The following headless commands are for testing/scripting
-        and do NOT touch the app's saved settings:
+        menu-bar UI. Headless commands:
 
           --get                         print live enabled / type / strength
-          --set-enabled 0|1             flip Color Filters master (live)
-          --set-intensity 0..1          set Color Filters strength (live)
+          --set-enabled 0|1             flip Color Filters master (LIVE)
+          --set-intensity 0..1          set Color Filters strength (LIVE; finite 0…1)
           --decide  --lat D --lon D [--sr-off M --ss-off M]
                                         print sunrise/sunset + on/off decision (read-only)
           --reconcile --lat D --lon D [--apply]
                                         as --decide; with --apply, set the live state
-          --render-panel [dir]          render the UI panels to PNGs (read-only;
+          --engine-status               read saved settings + live filter; print decision
+                                        (does not write settings; does not change the filter)
+          --engine-reconcile            apply saved-settings schedule to the live filter
+          --render-panel [dir]          render the UI panels to PNGs (does not write
+                                        settings or change the live filter;
                                         default dir: docs/evidence/cfs-ui)
           --selftest                    run headless panel-presentation regression;
                                         exit 0 if all pass (read-only)
-          --help                        this help
+          --help, -h                    this help
+
+        Invalid coordinates, non-finite offsets, or intensity outside finite 0…1
+        exit 2 before any live Color Filters read or write. Negative latitudes
+        and longitudes are accepted as values (only --flags start with --).
         """)
     }
 }

@@ -126,3 +126,41 @@ The app / login-item was NOT installed into the live machine, and the captain's
 real saved location was never written — all engine tests used the throwaway
 argument domain or explicit CLI args. The captain's Color Filters were left
 exactly as found (ON, type 16, intensity 0.9137303829193115).
+
+## 8. Hardening pass (2026-08-20) — read-only on the captain Mac
+
+Worktree `fm/nw-harden` at the reviewed base plus this pass. No live Color
+Filters mutation, no install, no write of `com.flo.color-filter-scheduler`.
+
+```
+swift test                         -> 47 passed (Swift Testing; CLT has no XCTest)
+swift build -c release             -> arm64
+swift build -c release --triple x86_64-apple-macosx13.0
+swift build -c release --triple arm64-apple-macosx13.0
+tests/panel-contract.sh            -> all 12 checks passed
+tests/ui-contract.sh               -> all 7 checks passed
+--selftest                         -> 3 passed, 0 failed
+--decide --lat 38.7223 --lon -9.1393
+  2026-08-20 21:41 WEST: sunrise 06:54:48, sunset 20:25:33, after sunset -> ON
+--decide --lat 91 --lon 0          -> exit 2 (no decision printed)
+--set-intensity nan                -> exit 2 (no live write)
+-h / --help                        -> lists --engine-status and --engine-reconcile
+./bundle.sh + tests/bundle-contract.sh
+  mktemp icon dir removed on EXIT; make-appicon fails visibly on a file path
+plutil -lint Info.plist            -> OK
+  CFBundleIdentifier=com.flo.color-filter-scheduler
+  LSUIElement=true; LSMinimumSystemVersion=13.0
+codesign --verify --deep --strict  -> satisfies Designated Requirement
+shellcheck bundle.sh install.sh uninstall.sh tests/*.sh -> clean
+```
+
+`defaults read com.apple.mediaaccessibility` SHA-256 before and after:
+`bc262e6af083f9e5d9e2250e1df5e13e9c0c658d0ddefc7c6fcad3baae7bffc9` (identical).
+Enabled `1`, type `16`, intensity `0.7199379832474226` unchanged.
+
+Installed app defaults (`com.flo.color-filter-scheduler`) unchanged:
+Lisbon `38.7078405, -9.1388862`, `automationEnabled=1`, `locationName=Lisbon, Portugal`.
+
+Physical click-through of the live menu-bar panel was not run: the captain
+install is out of bounds for this worktree. `--render-panel` wrote four non-empty
+PNGs and did not change the live app domain.

@@ -49,9 +49,9 @@ final class PanelHostingController<Content: View>: NSHostingController<Content> 
 }
 
 /// Menu-bar-only agent. Owns the NSStatusItem, the reconcile timer, and the
-/// custom SwiftUI key panel (the "Left"-style UI). The scheduling engine
-/// (Settings / ReconcileEngine / ColorFilters / Solar) is unchanged; this file
-/// is purely the presentation layer plus the timer/wake wiring.
+/// custom SwiftUI key panel (the "Left"-style UI). This file is the presentation
+/// layer plus the timer/wake wiring; scheduling and live filter access remain in
+/// their dedicated types.
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem!
     private var panel: StatusPanel!
@@ -94,7 +94,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func reconcileAndRefresh() {
         ReconcileEngine.reconcile()
         model?.refresh()
-        updateStatusAppearance()
     }
 
     // MARK: - Status item
@@ -108,12 +107,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.action = #selector(togglePanel(_:))
             button.target = self
         }
-    }
-
-    /// Subtly reflect "filter on" in the menu bar: template images auto-tint, so
-    /// we lean on the button's cell state rather than color.
-    private func updateStatusAppearance() {
-        statusItem?.button?.appearsDisabled = false
     }
 
     // MARK: - Key panel
@@ -147,7 +140,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func openPanel() {
         model.refresh()
-        updateStatusAppearance()
 
         let fittingSize = hostingController.sizeThatFits(
             in: NSSize(width: 288, height: CGFloat.greatestFiniteMagnitude))

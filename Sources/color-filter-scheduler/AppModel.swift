@@ -1,6 +1,64 @@
 import SwiftUI
 import Combine
 import CoreLocation
+import ColorFilterEngine
+
+/// Live Color Filters read/write. Production talks to MediaAccessibility;
+/// tests and `--render-panel` inject an inert copy so they never touch SPI.
+struct LiveColorFilters {
+    var isEnabled: () -> Bool
+    var strength: () -> Double
+    var setEnabled: (Bool) -> Void
+    var setStrength: (Double) -> Void
+
+    static let system = LiveColorFilters(
+        isEnabled: { ColorFilters.isEnabled },
+        strength: { ColorFilters.strength },
+        setEnabled: { ColorFilters.setEnabled($0) },
+        setStrength: { ColorFilters.strength = $0 }
+    )
+
+    static let inert = LiveColorFilters(
+        isEnabled: { false },
+        strength: { 0 },
+        setEnabled: { _ in },
+        setStrength: { _ in }
+    )
+}
+
+/// City → coordinates lookup. `CLGeocoder` is wrapped so tests can complete
+/// requests out of order without hitting the network.
+protocol CityLookingUp: AnyObject {
+    func cancel()
+    func lookup(_ query: String, completion: @escaping (Result<(Coordinates, String), Error>) -> Void)
+}
+
+final class SystemCityLookup: CityLookingUp {
+    private let geocoder = CLGeocoder()
+
+    func cancel() { geocoder.cancelGeocode() }
+
+    func lookup(_ query: String, completion: @escaping (Result<(Coordinates, String), Error>) -> Void) {
+        geocoder.geocodeAddressString(query) { placemarks, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+            guard let placemark = placemarks?.first, let loc = placemark.location else {
+                completion(.failure(CLError(.geocodeFoundNoResult)))
+                return
+            }
+            let lat = loc.coordinate.latitude
+            let lon = loc.coordinate.longitude
+            guard let coords = Coordinates(latitude: lat, longitude: lon) else {
+                completion(.failure(CLError(.geocodeFoundNoResult)))
+                return
+            }
+            let name = AppModel.placeName(placemark, fallback: query)
+            completion(.success((coords, name)))
+        }
+    }
+}
 
 /// UI-facing view model. It is a thin, observable bridge over the (unchanged)
 /// engine: `ColorFilters` (live MediaAccessibility state), `Settings` (persisted
@@ -13,49 +71,67 @@ import CoreLocation
 ///    off), so nothing ever moves the filter behind the user's back.
 ///  • Automatic ON: the solar scheduler owns the filter. Turning it on reconciles
 ///    immediately. A manual Run/Pause while Automatic is on is a *temporary
-///    override* — the next reconcile (timer, wake, or the next sunrise/sunset
-///    transition) pulls the filter back to what the schedule wants.
+///    override* — the next reconcile (timer or wake, within about five minutes)
+///    pulls the filter back to what the schedule wants.
 final class AppModel: ObservableObject {
     /// Live master state of Color Filters (mirrors `ColorFilters.isEnabled`).
-    @Published var filterOn: Bool = ColorFilters.isEnabled
+    @Published var filterOn: Bool = false
     /// Live effect intensity, 0…1 (mirrors `ColorFilters.strength`).
-    @Published var strength: Double = ColorFilters.strength
+    @Published var strength: Double = 0
     /// Persisted master switch for solar automation.
-    @Published var automationEnabled: Bool = Settings.shared.automationEnabled
+    @Published var automationEnabled: Bool = false
     /// Editable location strings (seed the Settings fine-tune fields). Empty when unset.
-    @Published var latitudeText: String = Settings.shared.latitude.map(AppModel.trim) ?? ""
-    @Published var longitudeText: String = Settings.shared.longitude.map(AppModel.trim) ?? ""
+    @Published var latitudeText: String = ""
+    @Published var longitudeText: String = ""
     /// The city-name text the user types to geocode (primary location input).
-    @Published var cityText: String = Settings.shared.locationName ?? ""
+    /// An unsubmitted draft is never the front-page location label.
+    @Published var cityText: String = ""
     /// Inline feedback for the city geocode (resolved place, or an error).
     @Published var geocodeMessage: String = ""
     /// Whether the last geocode outcome was a success (drives message color).
     @Published var lastGeocodeOK: Bool = true
     /// True while a geocode request is in flight, so the UI can show progress.
     @Published var isGeocoding: Bool = false
-    /// One-line human status (kept for scripting/evidence; no longer shown in UI).
-    @Published var statusText: String = ""
+    /// Saved location is usable for scheduling.
+    @Published var hasLocation: Bool = false
+    /// Front-row location label: resolved place name, else coordinates, else a prompt.
+    @Published var locationDisplay: String = "Not set"
+    /// Short "37.77, -122.42" style summary, or a prompt when unset.
+    @Published var locationSummary: String = "Not set"
 
-    /// Forward-geocoder for the city → coordinates lookup. CLGeocoder's forward
-    /// geocoding needs no location permission (it's an address lookup), only
-    /// network at resolve time; completions arrive on the main queue.
-    private let geocoder = CLGeocoder()
+    let settings: ColorFilterEngine.Settings
+    private let live: LiveColorFilters
+    private let geocoder: CityLookingUp
+    private let reconcile: () -> Void
+    /// Incremented for every submitted lookup (and empty-query supersede).
+    /// Completions whose token is no longer current must not mutate state.
+    private var geocodeGeneration: UInt64 = 0
 
-    init() {
+    init(settings: ColorFilterEngine.Settings = .shared,
+         live: LiveColorFilters = .system,
+         geocoder: CityLookingUp? = nil,
+         reconcile: @escaping () -> Void = { ReconcileEngine.reconcile() }) {
+        self.settings = settings
+        self.live = live
+        self.geocoder = geocoder ?? SystemCityLookup()
+        self.reconcile = reconcile
         refresh()
+        latitudeText = settings.latitude.map(AppModel.trim) ?? ""
+        longitudeText = settings.longitude.map(AppModel.trim) ?? ""
+        cityText = settings.locationName ?? ""
     }
 
     // MARK: - Front panel actions
 
     /// Run = turn the filter ON right now, live, so the screen visibly changes.
     func run() {
-        ColorFilters.setEnabled(true)
+        live.setEnabled(true)
         refresh()
     }
 
     /// Pause = turn the filter OFF right now, live.
     func pause() {
-        ColorFilters.setEnabled(false)
+        live.setEnabled(false)
         refresh()
     }
 
@@ -66,31 +142,38 @@ final class AppModel: ObservableObject {
     // MARK: - Settings actions
 
     func setStrength(_ value: Double) {
-        ColorFilters.strength = value
-        strength = ColorFilters.strength
+        live.setStrength(value)
+        strength = live.strength()
     }
 
     /// Turn solar automation on/off. Turning it on hands control to the
     /// scheduler and reconciles immediately so the filter snaps to the schedule.
     func setAutomation(_ on: Bool) {
-        Settings.shared.automationEnabled = on
+        settings.automationEnabled = on
         automationEnabled = on
-        ReconcileEngine.reconcile()
+        reconcile()
         refresh()
     }
 
-    /// Commit the lat/lon text fields to persisted settings (validated), then
-    /// reconcile so a schedule change takes effect at once.
+    /// Commit the lat/lon text fields as one validated pair. Invalid input
+    /// writes nothing, does not reconcile, and surfaces an inline error.
     func applyLocation() {
-        if let lat = Double(latitudeText.trimmingCharacters(in: .whitespaces)),
-           lat >= -90, lat <= 90 {
-            Settings.shared.latitude = lat
+        guard let coords = Coordinates.parse(latitudeText: latitudeText,
+                                             longitudeText: longitudeText) else {
+            lastGeocodeOK = false
+            geocodeMessage = "Enter a valid latitude (−90…90) and longitude (−180…180)."
+            return
         }
-        if let lon = Double(longitudeText.trimmingCharacters(in: .whitespaces)),
-           lon >= -180, lon <= 180 {
-            Settings.shared.longitude = lon
+        let previous = settings.coordinates
+        settings.coordinates = coords
+        if previous != coords {
+            settings.locationName = nil
         }
-        ReconcileEngine.reconcile()
+        latitudeText = Self.trim(coords.latitude)
+        longitudeText = Self.trim(coords.longitude)
+        lastGeocodeOK = true
+        geocodeMessage = ""
+        reconcile()
         refresh()
     }
 
@@ -101,7 +184,11 @@ final class AppModel: ObservableObject {
     /// is never blocked (the request is async, completion on the main queue).
     func resolveCity() {
         let query = cityText.trimmingCharacters(in: .whitespacesAndNewlines)
+        geocodeGeneration += 1
+        let token = geocodeGeneration
+        geocoder.cancel()
         guard !query.isEmpty else {
+            isGeocoding = false
             lastGeocodeOK = false
             geocodeMessage = "Type a city name, e.g. Lisbon."
             return
@@ -109,40 +196,32 @@ final class AppModel: ObservableObject {
         isGeocoding = true
         lastGeocodeOK = true
         geocodeMessage = "Resolving…"
-        geocoder.cancelGeocode()
-        geocoder.geocodeAddressString(query) { [weak self] placemarks, error in
-            guard let self = self else { return }
+        geocoder.lookup(query) { [weak self] result in
+            guard let self else { return }
+            guard token == self.geocodeGeneration else { return }
             self.isGeocoding = false
-            if let error = error {
+            switch result {
+            case .failure(let error):
                 let msg = Self.friendlyGeocodeError(error)
-                if msg.isEmpty { return }   // canceled by a newer request; keep prior state
+                if msg.isEmpty { return }   // canceled; keep busy/message of current request
                 self.lastGeocodeOK = false
                 self.geocodeMessage = msg
-                return
+            case .success(let (coords, name)):
+                self.settings.coordinates = coords
+                self.settings.locationName = name
+                self.latitudeText = Self.trim(coords.latitude)
+                self.longitudeText = Self.trim(coords.longitude)
+                self.cityText = name
+                self.lastGeocodeOK = true
+                self.geocodeMessage = "\(name) · \(Self.trim(coords.latitude)), \(Self.trim(coords.longitude))"
+                self.reconcile()
+                self.refresh()
             }
-            guard let placemark = placemarks?.first, let loc = placemark.location else {
-                self.lastGeocodeOK = false
-                self.geocodeMessage = "Couldn’t find “\(query)”. Check the spelling or set lat/long below."
-                return
-            }
-            let lat = loc.coordinate.latitude
-            let lon = loc.coordinate.longitude
-            let name = Self.placeName(placemark, fallback: query)
-            Settings.shared.latitude = lat
-            Settings.shared.longitude = lon
-            Settings.shared.locationName = name
-            self.latitudeText = Self.trim(lat)
-            self.longitudeText = Self.trim(lon)
-            self.cityText = name
-            self.lastGeocodeOK = true
-            self.geocodeMessage = "\(name) · \(Self.trim(lat)), \(Self.trim(lon))"
-            ReconcileEngine.reconcile()
-            self.refresh()
         }
     }
 
     /// Map a CLGeocoder error to a short, human message (no network, not found…).
-    private static func friendlyGeocodeError(_ error: Error) -> String {
+    static func friendlyGeocodeError(_ error: Error) -> String {
         if let clError = error as? CLError {
             switch clError.code {
             case .network:
@@ -159,42 +238,30 @@ final class AppModel: ObservableObject {
     }
 
     /// Build a compact "City, Country" label from a placemark.
-    private static func placeName(_ p: CLPlacemark, fallback: String) -> String {
+    static func placeName(_ p: CLPlacemark, fallback: String) -> String {
         let primary = p.locality ?? p.name ?? p.administrativeArea
         let parts = [primary, p.country].compactMap { $0 }.filter { !$0.isEmpty }
         return parts.isEmpty ? fallback : parts.joined(separator: ", ")
     }
 
-    var hasLocation: Bool { Settings.shared.hasValidLocation }
-
-    /// Front-row location label: the resolved place name when known, else the
-    /// coordinate summary, else a prompt.
-    var locationDisplay: String {
-        if let name = Settings.shared.locationName, !name.isEmpty { return name }
-        return locationSummary
-    }
-
-    /// Short "37.77, -122.42" style summary, or a prompt when unset.
-    var locationSummary: String {
-        guard let lat = Settings.shared.latitude, let lon = Settings.shared.longitude,
-              Settings.shared.hasValidLocation else {
-            return "Not set"
-        }
-        return "\(Self.trim(lat)), \(Self.trim(lon))"
-    }
-
     // MARK: - Refresh (pull live engine state into the published properties)
 
     func refresh() {
-        filterOn = ColorFilters.isEnabled
-        strength = ColorFilters.strength
-        automationEnabled = Settings.shared.automationEnabled
-        statusText = Self.makeStatus()
+        filterOn = live.isEnabled()
+        strength = live.strength()
+        automationEnabled = settings.automationEnabled
+        hasLocation = settings.hasValidLocation
+        locationSummary = Self.summary(for: settings)
+        if let name = settings.locationName, !name.isEmpty {
+            locationDisplay = name
+        } else {
+            locationDisplay = locationSummary
+        }
     }
 
-    private static func makeStatus() -> String {
-        let on = ColorFilters.isEnabled ? "On" : "Off"
-        return Settings.shared.automationEnabled ? "\(on) · auto" : on
+    private static func summary(for settings: ColorFilterEngine.Settings) -> String {
+        guard let coords = settings.coordinates else { return "Not set" }
+        return "\(trim(coords.latitude)), \(trim(coords.longitude))"
     }
 
     static func trim(_ v: Double) -> String { String(format: "%g", v) }
