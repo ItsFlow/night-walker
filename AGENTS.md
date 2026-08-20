@@ -83,8 +83,8 @@ URL: `https://itsflow.github.io/night-walker/`.
 The Download button is a relative `NightWalker.dmg` href — replace that file
 in place to ship a new build without touching the page.
 `tests/site-contract.sh` is the HTTP contract. `.github/workflows/site.yml`
-runs it. Pages source is the branch `/docs` folder (point it at `main` after
-the site branch merges). Do not rewrite the Swift app to change the page.
+runs it and deploys `docs/` through GitHub Actions after pushes to `main`.
+Do not rewrite the Swift app to change the page.
 
 ## Maintaining this file
 
