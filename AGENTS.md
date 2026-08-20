@@ -39,9 +39,9 @@ The presentation is a custom near-black, borderless `NSPanel` hosting SwiftUI,
 - `MenuBarIcon.swift` / `EclipseMark.swift` — programmatic monochrome template
   eclipse: filled disc + thin right crescent. No flames, spikes, or rays.
   macOS tints the template.
-- `tools/make-appicon.swift` — same silhouette for the `.icns` (light crescent
-  on a dark tile). Run by `bundle.sh`. Keep its unit-space numbers in sync
-  with `EclipseMark.swift`.
+- `tools/make-appicon.swift` — same silhouette for the `.icns` (black disc +
+  black crescent on a light tile). Run by `bundle.sh`. Keep its unit-space
+  numbers in sync with `EclipseMark.swift`.
 - `--render-panel <dir>` CLI regenerates the AppKit-backed panel screenshots
   (panel architecture: `docs/evidence/cfs-ui3/`; brand glyph: `docs/evidence/nw-brand/`).
 Any UI/engine testing MUST restore Color Filters to the pre-test state (see

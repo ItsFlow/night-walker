@@ -4,9 +4,8 @@
 // Xcode). bundle.sh runs this, then `iconutil` assembles the .icns.
 //
 // Same Night Walker eclipse as Sources/.../EclipseMark.swift (keep the unit-
-// space numbers in sync): filled disc + thin right crescent. No flames.
-// Dock/app icon is that silhouette on a dark tile; the crescent is light so
-// it reads (the menu-bar template is monochrome black).
+// space numbers in sync): black disc + thin right crescent on a light tile.
+// No flames. The menu-bar template is the same silhouette, monochrome.
 //
 // Usage: swift tools/make-appicon.swift <output-iconset-dir>
 
@@ -23,8 +22,9 @@ try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirecto
 // Unit square, origin bottom-left, y-up. Must match EclipseMark.swift.
 let markCY: CGFloat = 0.50
 let markR: CGFloat = 0.40
-let markGapFrac: CGFloat = 0.055
-let markOffsetFrac: CGFloat = 0.075
+// Measured from the canonical 1024px jpg (disc r=208, gap=21, sliver=22).
+let markGapFrac: CGFloat = 0.101
+let markOffsetFrac: CGFloat = 0.106
 let markMinGap: CGFloat = 1.15
 let markMinOffset: CGFloat = 1.45
 
@@ -62,20 +62,19 @@ func draw(_ px: CGFloat) -> NSImage {
     let img = NSImage(size: size, flipped: false) { rect in
         let corner = px * 0.22
         let tile = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
-        let tileColor = NSColor(calibratedWhite: 0.16, alpha: 1)
+        // Light tile so the black disc reads — same as the canonical jpg.
+        let tileColor = NSColor(calibratedWhite: 0.97, alpha: 1)
         tileColor.setFill()
         tile.fill()
         tile.addClip()
 
         let g = eclipseGeometry(in: rect)
 
-        // Crescent: fill the offset circle, then cover the overlap with the
-        // tile so only the right sliver remains. No flames.
-        NSColor(calibratedWhite: 0.96, alpha: 1).setFill()
+        // Black crescent, then punch the gap with the tile, then black disc.
+        NSColor.black.setFill()
         NSBezierPath(ovalIn: g.outer).fill()
         tileColor.setFill()
         NSBezierPath(ovalIn: g.punch).fill()
-
         NSColor.black.setFill()
         NSBezierPath(ovalIn: g.disc).fill()
 

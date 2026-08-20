@@ -19,8 +19,9 @@ enum EclipseMark {
 
     static let cy: CGFloat = 0.50
     static let r: CGFloat = 0.40
-    static let gapFrac: CGFloat = 0.055     // of r, large sizes
-    static let offsetFrac: CGFloat = 0.075  // of r, large sizes
+    // Measured from the canonical 1024px jpg (disc r=208, gap=21, sliver=22).
+    static let gapFrac: CGFloat = 0.101
+    static let offsetFrac: CGFloat = 0.106
     static let minGap: CGFloat = 1.15       // points, small sizes
     static let minOffset: CGFloat = 1.45
 
