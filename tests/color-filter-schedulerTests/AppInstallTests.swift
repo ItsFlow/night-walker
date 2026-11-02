@@ -52,4 +52,9 @@ import Testing
         #expect(!AppInstall.ensureLaunchAgent(bundlePath: app, executable: "\(app)/Contents/MacOS/color-filter-scheduler", home: home))
         #expect(!FileManager.default.fileExists(atPath: "\(home)/Library/LaunchAgents"))
     }
+
+    @Test func dmgCopyNeverQuitsTheInstalledOne() {
+        #expect(AppInstall.quitOtherInstances(bundlePath: "/Volumes/Night Walker/Night Walker.app", home: "/Users/x") == 0)
+        #expect(AppInstall.quitOtherInstances(bundlePath: "/Users/x/Projects/night-walker/dist/Night Walker.app", home: "/Users/x") == 0)
+    }
 }

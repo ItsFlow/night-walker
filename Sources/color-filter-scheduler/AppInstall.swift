@@ -63,15 +63,25 @@ enum AppInstall {
         }
     }
 
-    /// Quit any other running copy with our bundle id (for example an older
+    /// Quit any older running copy with our bundle id (for example an older
     /// "Color Filter Scheduler.app"), so two schedulers never fight the filter
-    /// and the menu bar shows one eclipse. The copy just launched wins.
-    static func quitOtherInstances() {
-        guard let id = Bundle.main.bundleIdentifier else { return }
-        let me = ProcessInfo.processInfo.processIdentifier
+    /// and the menu bar shows one eclipse. Only a copy installed in an
+    /// Applications folder takes over: opening the app from the DMG or a build
+    /// dir must not kill the installed copy. Only copies launched before this
+    /// one are quit, so two copies starting together cannot quit each other.
+    @discardableResult
+    static func quitOtherInstances(bundlePath: String = Bundle.main.bundlePath,
+                                   home: String = NSHomeDirectory()) -> Int {
+        guard isStableInstallPath(bundlePath, home: home),
+              let id = Bundle.main.bundleIdentifier else { return 0 }
+        let current = NSRunningApplication.current
+        let myLaunch = current.launchDate ?? Date()
+        var asked = 0
         for app in NSRunningApplication.runningApplications(withBundleIdentifier: id)
-        where app.processIdentifier != me {
-            app.terminate()
+        where app.processIdentifier != current.processIdentifier
+            && (app.launchDate ?? .distantPast) <= myLaunch {
+            if app.terminate() { asked += 1 }
         }
+        return asked
     }
 }

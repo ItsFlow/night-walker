@@ -28,6 +28,8 @@ trap cleanup_stage EXIT
 
 ditto "$APP" "$STAGE/$APP_NAME.app"
 ln -s /Applications "$STAGE/Applications"
+# The Open Anyway note is only true for a build that is not notarized.
+if [[ -z "${NW_SIGN_IDENTITY:-}" || -z "${NW_NOTARY_PROFILE:-}" ]]; then
 cat > "$STAGE/If macOS blocks it.txt" <<'NOTE'
 Night Walker is a free app that is not notarized by Apple, so the first time
 you open it macOS says it "could not verify" it. That is expected.
@@ -42,6 +44,7 @@ icon, no Dock icon) and starts again at every login.
 
 Source: https://github.com/ItsFlow/night-walker
 NOTE
+fi
 
 rm -f "$DMG"
 echo "==> Creating $DMG"
