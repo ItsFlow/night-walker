@@ -12,16 +12,26 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="Night Walker"
 BUNDLE_ID="com.flo.color-filter-scheduler"
 EXECUTABLE="color-filter-scheduler"
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 DIST="$REPO_DIR/dist"
 APP="$DIST/$APP_NAME.app"
 
-echo "==> Building (swift build -c release)…"
+# Universal (Apple Silicon + Intel) so one download works on every Mac.
+# `--arch a --arch b` needs Xcode's xcbuild, so build each triple and lipo.
 cd "$REPO_DIR"
-swift build -c release
-BUILT="$REPO_DIR/.build/release/$EXECUTABLE"
-[[ -x "$BUILT" ]] || { echo "error: build did not produce $BUILT" >&2; exit 1; }
+SLICES=()
+for arch in arm64 x86_64; do
+    triple="$arch-apple-macosx13.0"
+    echo "==> Building $triple (swift build -c release)…"
+    swift build -c release --triple "$triple"
+    slice="$(swift build -c release --triple "$triple" --show-bin-path)/$EXECUTABLE"
+    [[ -x "$slice" ]] || { echo "error: build did not produce $slice" >&2; exit 1; }
+    SLICES+=("$slice")
+done
+BUILT="$REPO_DIR/.build/$EXECUTABLE-universal"
+lipo -create "${SLICES[@]}" -output "$BUILT"
+lipo -info "$BUILT"
 
 echo "==> Assembling $APP"
 rm -rf "$APP"
@@ -71,9 +81,17 @@ EOF
 # Marker so bundled-app UserDefaults/domain is unambiguous.
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-echo "==> Ad-hoc signing"
-codesign --force --sign - --identifier "$BUNDLE_ID" "$APP"
-codesign --verify --verbose=1 "$APP"
+# NW_SIGN_IDENTITY="Developer ID Application: …" signs for notarization
+# (hardened runtime + secure timestamp). Unset = ad-hoc, which runs locally but
+# is blocked by Gatekeeper when downloaded (see make-dmg.sh).
+if [[ -n "${NW_SIGN_IDENTITY:-}" ]]; then
+    echo "==> Signing with Developer ID"
+    codesign --force --options runtime --timestamp --sign "$NW_SIGN_IDENTITY" --identifier "$BUNDLE_ID" "$APP"
+else
+    echo "==> Ad-hoc signing"
+    codesign --force --sign - --identifier "$BUNDLE_ID" "$APP"
+fi
+codesign --verify --strict --verbose=1 "$APP"
 
 echo
 echo "Built: $APP"

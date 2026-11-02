@@ -68,6 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let reconcileInterval: TimeInterval = 300  // 5 minutes
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppInstall.quitOtherInstances()
+        AppInstall.ensureLaunchAgent()
         model = AppModel()
         buildStatusItem()
         buildPanel()

@@ -9,7 +9,9 @@ LABEL="com.flo.color-filter-scheduler"
 APP_NAME="Night Walker"
 EXECUTABLE="color-filter-scheduler"
 INSTALLED_APP="$HOME/Applications/$APP_NAME.app"
+DRAGGED_APP="/Applications/$APP_NAME.app"  # where a DMG install lands
 APP_BINARY="$INSTALLED_APP/Contents/MacOS/$EXECUTABLE"
+[[ -x "$APP_BINARY" ]] || APP_BINARY="$DRAGGED_APP/Contents/MacOS/$EXECUTABLE"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_DIR="$HOME/Library/Logs"
 UID_NUM="$(id -u)"
@@ -20,6 +22,9 @@ PURGE=0
 echo "==> Unloading login-item agent"
 launchctl bootout "gui/$UID_NUM/$LABEL" 2>/dev/null || true
 
+echo "==> Quitting any running copy"
+pkill -x "$EXECUTABLE" 2>/dev/null || true
+
 echo "==> Turning Color Filters OFF"
 if [[ -x "$APP_BINARY" ]]; then
     "$APP_BINARY" --set-enabled 0 || true
@@ -28,6 +33,7 @@ fi
 echo "==> Removing files"
 rm -f "$PLIST"
 rm -rf "$INSTALLED_APP"
+if [[ -d "$DRAGGED_APP" ]]; then rm -rf "$DRAGGED_APP" 2>/dev/null || echo "    could not remove $DRAGGED_APP (drag it to the Bin)"; fi
 rm -f "$LOG_DIR/color-filter-scheduler.log" "$LOG_DIR/color-filter-scheduler.err.log"
 
 if [[ "$PURGE" == "1" ]]; then
