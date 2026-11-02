@@ -19,7 +19,25 @@ swift build -c release                 # binary at .build/release/color-filter-s
 ./bundle.sh                            # assemble + ad-hoc sign dist/Night Walker.app
 ```
 
-## Install (to ~/Applications + launch at login)
+## Download build (DMG)
+
+```sh
+./make-dmg.sh                          # universal app + dist/NightWalker-<version>.dmg
+```
+
+Drag the app to Applications and open it. On first open it quits any other
+running copy (for example an old `Color Filter Scheduler.app`) and points the
+login agent at itself, so it starts at every login. A copy run straight from
+the DMG or a translocated path does not register.
+
+The DMG is ad-hoc signed and not notarized, so macOS blocks the first open of a
+downloaded copy ("Apple could not verify…"). On macOS 15 right-click → Open no
+longer skips this: use System Settings → Privacy & Security → **Open Anyway**
+(the DMG ships a note saying so). Set `NW_SIGN_IDENTITY` (Developer ID
+Application) and `NW_NOTARY_PROFILE` (a `notarytool store-credentials` profile)
+to build a signed, notarized, stapled DMG that opens with no warning.
+
+## Install from source (to ~/Applications + launch at login)
 
 ```sh
 ./install.sh

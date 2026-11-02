@@ -54,6 +54,12 @@ below); `--render-panel` is read-only w.r.t. the live filter.
   (the standard CLT no-Xcode pattern: release build → hand-assembled `.app` →
   `codesign -s -`). `install.sh` installs to `~/Applications` + a launch-at-login
   LaunchAgent (`com.flo.color-filter-scheduler.plist.template`).
+- `./make-dmg.sh` → universal (per-triple build + `lipo`; CLT has no xcbuild for
+  `--arch a --arch b`) `dist/NightWalker-<version>.dmg`. Version lives in
+  `bundle.sh`. Ad-hoc = Gatekeeper blocks downloaded copies until Open Anyway;
+  notarizing needs `NW_SIGN_IDENTITY` + `NW_NOTARY_PROFILE`. GUI launch from
+  an Applications folder quits other same-bundle-id copies and repoints the
+  login agent (`AppInstall.swift`).
 - `swift test` is the real engine/settings/CLI suite (Solar, Scheduler,
   Settings fail-closed, atomic lat/lon, geocode request tokens). CLT has
   **Swift Testing**, not XCTest — do not reintroduce `import XCTest`. Keep
