@@ -2,9 +2,10 @@ import CMediaAccessibility
 
 /// Thin wrapper over the MediaAccessibility "Color Filters" controls.
 ///
-/// This flips the master on/off and adjusts the effect intensity. It never
-/// changes the filter *type* — whatever the user chose in System Settings
-/// (grayscale, color tint, protanopia, etc.) is preserved.
+/// This flips the master on/off and adjusts the effect intensity. Turning it on
+/// first makes sure the filter type is Color Tint: a Mac that never opened the
+/// Color Filters settings defaults to Grayscale, which turned the screen black
+/// and white instead of red. A Mac already on Color Tint keeps its own hue.
 enum ColorFilters {
     /// The "Color Filters" category id (the "__Color__" preference domain).
     /// Confirmed empirically: of the categories returned by
@@ -18,9 +19,31 @@ enum ColorFilters {
         MADisplayFilterPrefGetCategoryEnabled(colorCategory) != 0
     }
 
-    /// Set the master state.
+    /// Set the master state. Turning on applies the red tint first.
     static func setEnabled(_ on: Bool) {
+        if on { ensureRedTint() }
         MADisplayFilterPrefSetCategoryEnabled(colorCategory, on ? 1 : 0)
+    }
+
+    /// "Color Tint" in the System Settings filter type popup.
+    static let colorTintType: Int = 16
+    /// Red on the tint hue wheel (the value an untouched Mac reports).
+    static let redHue: Double = 1.0
+
+    /// What to write so the filter shows red: nothing if the type is already
+    /// Color Tint (respect a hue the user picked), else type + red hue.
+    static func tintWrites(currentType: Int) -> (type: Int, hue: Double)? {
+        currentType == colorTintType ? nil : (colorTintType, redHue)
+    }
+
+    /// Switch the filter to a red Color Tint if it is set to anything else.
+    /// Idempotent: writes nothing when already Color Tint.
+    @discardableResult
+    static func ensureRedTint() -> Bool {
+        guard let w = tintWrites(currentType: filterType) else { return false }
+        MADisplayFilterPrefSetSingleColorHue(w.hue)
+        MADisplayFilterPrefSetType(colorCategory, w.type)
+        return true
     }
 
     /// The currently-selected Color Filters filter type.
