@@ -29,11 +29,15 @@ enum ColorFilters {
     static let colorTintType: Int = 16
     /// Red on the tint hue wheel (the value an untouched Mac reports).
     static let redHue: Double = 1.0
+    /// Starting strength when switching a Mac onto Color Tint (macOS's own
+    /// default of 0.4 is a faint pink). A Mac already on Color Tint keeps its own.
+    static let startingIntensity: Double = 0.88
 
     /// What to write so the filter shows red: nothing if the type is already
-    /// Color Tint (respect a hue the user picked), else type + red hue.
-    static func tintWrites(currentType: Int) -> (type: Int, hue: Double)? {
-        currentType == colorTintType ? nil : (colorTintType, redHue)
+    /// Color Tint (respect the hue and strength the user picked), else type,
+    /// red hue and the starting strength.
+    static func tintWrites(currentType: Int) -> (type: Int, hue: Double, intensity: Double)? {
+        currentType == colorTintType ? nil : (colorTintType, redHue, startingIntensity)
     }
 
     /// Switch the filter to a red Color Tint if it is set to anything else.
@@ -42,6 +46,7 @@ enum ColorFilters {
     static func ensureRedTint() -> Bool {
         guard let w = tintWrites(currentType: filterType) else { return false }
         MADisplayFilterPrefSetSingleColorHue(w.hue)
+        MADisplayFilterPrefSetSingleColorIntensity(w.intensity)
         MADisplayFilterPrefSetType(colorCategory, w.type)
         return true
     }

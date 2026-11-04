@@ -6,6 +6,7 @@ import Testing
         let w = ColorFilters.tintWrites(currentType: 1)
         #expect(w?.type == 16)
         #expect(w?.hue == 1.0)
+        #expect(w?.intensity == 0.88)
     }
 
     @Test func colourBlindnessTypesAlsoSwitch() {
