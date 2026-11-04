@@ -43,7 +43,10 @@ enum ReconcileEngine {
                                         sunriseOffsetMinutes: s.sunriseOffsetMinutes,
                                         sunsetOffsetMinutes: s.sunsetOffsetMinutes,
                                         now: now)
-        guard ColorFilters.isEnabled != decision.wantOn else { return false }  // idempotent
+        // A filter already on in Grayscale (1.0.1 on a fresh Mac) gets fixed too.
+        var retinted = false
+        if decision.wantOn && ColorFilters.isEnabled { retinted = ColorFilters.ensureRedTint() }
+        guard ColorFilters.isEnabled != decision.wantOn else { return retinted }  // idempotent
         ColorFilters.setEnabled(decision.wantOn)
         return true
     }

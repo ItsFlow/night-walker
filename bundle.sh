@@ -12,7 +12,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_NAME="Night Walker"
 BUNDLE_ID="com.flo.color-filter-scheduler"
 EXECUTABLE="color-filter-scheduler"
-VERSION="1.0.1"
+VERSION="1.0.2"
 
 DIST="$REPO_DIR/dist"
 APP="$DIST/$APP_NAME.app"

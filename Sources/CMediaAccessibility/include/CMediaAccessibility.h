@@ -40,4 +40,15 @@ extern long MADisplayFilterPrefGetType(long category);
 extern double MADisplayFilterPrefGetSingleColorIntensity(void);
 extern void MADisplayFilterPrefSetSingleColorIntensity(double intensity);
 
+// Select the filter type for a category (same CATEGORY argument as GetType).
+// Type values match the System Settings popup: 1 Grayscale, 2/4/8 the colour
+// blindness corrections, 16 Color Tint. A fresh Mac has no preference and
+// reports 1 (Grayscale), so turning the master on alone shows grey, not red.
+extern void MADisplayFilterPrefSetType(long category, long type);
+
+// Hue of the Color Tint filter, 0.0...1.0 on the colour wheel. Both 0 and 1
+// are red; an untouched Mac reports 1.0. Returns a double like the intensity.
+extern double MADisplayFilterPrefGetSingleColorHue(void);
+extern void MADisplayFilterPrefSetSingleColorHue(double hue);
+
 #endif /* CMEDIAACCESSIBILITY_H */
